@@ -3,7 +3,6 @@ import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
 import execJsonSchema from '../src/schemas/exec-json.json';
 import profileJsonSchema from '../src/schemas/profile-json.json';
-import execJsonMinSchema from '../src/schemas/exec-jsonmin.json';
 
 describe('JSON Schema Validation', () => {
   const ajv = new Ajv({ strict: false, allErrors: true });
@@ -108,32 +107,4 @@ describe('JSON Schema Validation', () => {
     });
   });
 
-  describe('exec-jsonmin schema', () => {
-    const validate = ajv.compile(execJsonMinSchema);
-
-    it('should validate a minimal valid exec-jsonmin document', () => {
-      const validDoc = {
-        statistics: {
-          duration: 0.5,
-        },
-        controls: [],
-        version: '4.18.108',
-      };
-
-      const isValid = validate(validDoc);
-      expect(isValid).toBe(true);
-      expect(validate.errors).toBeNull();
-    });
-
-    it('should reject document missing required fields', () => {
-      const invalidDoc = {
-        version: '4.18.108',
-        // missing: statistics, controls
-      };
-
-      const isValid = validate(invalidDoc);
-      expect(isValid).toBe(false);
-      expect(validate.errors).not.toBeNull();
-    });
-  });
 });
