@@ -1,5 +1,5 @@
 {
-  "$id": "https://mitre.github.io/hdf-libs/schemas/profile-json/v1.0.0",
+  "$id": "https://mitre.github.io/hdf-libs/schemas/hdf-baseline/v1.0.0",
   "type": "object",
   "additionalProperties": true,
   "required": [

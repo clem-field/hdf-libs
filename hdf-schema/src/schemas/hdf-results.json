@@ -1,5 +1,5 @@
 {
-  "$id": "https://mitre.github.io/hdf-libs/schemas/exec-json/v1.0.0",
+  "$id": "https://mitre.github.io/hdf-libs/schemas/hdf-results/v1.0.0",
   "type": "object",
   "additionalProperties": true,
   "required": [

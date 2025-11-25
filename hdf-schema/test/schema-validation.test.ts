@@ -1,17 +1,17 @@
 import { describe, it, expect } from 'vitest';
 import Ajv from 'ajv';
 import addFormats from 'ajv-formats';
-import execJsonSchema from '../src/schemas/exec-json.json';
-import profileJsonSchema from '../src/schemas/profile-json.json';
+import hdfResultsSchema from '../src/schemas/hdf-results.json';
+import hdfBaselineSchema from '../src/schemas/hdf-baseline.json';
 
 describe('JSON Schema Validation', () => {
   const ajv = new Ajv({ strict: false, allErrors: true });
   addFormats(ajv);
 
-  describe('exec-json schema', () => {
-    const validate = ajv.compile(execJsonSchema);
+  describe('hdf-results schema', () => {
+    const validate = ajv.compile(hdfResultsSchema);
 
-    it('should validate a minimal valid exec-json document', () => {
+    it('should validate a minimal valid hdf-results document', () => {
       const validDoc = {
         platform: {
           name: 'ubuntu',
@@ -45,7 +45,7 @@ describe('JSON Schema Validation', () => {
         platform: { name: 'ubuntu', release: '20.04' },
         profiles: [
           {
-            name: 'test-profile',
+            name: 'test-baseline',
             sha256: 'abc123',
             supports: [],
             attributes: [],
@@ -78,12 +78,12 @@ describe('JSON Schema Validation', () => {
     });
   });
 
-  describe('profile-json schema', () => {
-    const validate = ajv.compile(profileJsonSchema);
+  describe('hdf-baseline schema', () => {
+    const validate = ajv.compile(hdfBaselineSchema);
 
-    it('should validate a minimal valid profile-json document', () => {
+    it('should validate a minimal valid hdf-baseline document', () => {
       const validDoc = {
-        name: 'test-profile',
+        name: 'test-baseline',
         supports: [],
         controls: [],
         groups: [],
@@ -97,7 +97,7 @@ describe('JSON Schema Validation', () => {
 
     it('should reject document missing required fields', () => {
       const invalidDoc = {
-        name: 'test-profile',
+        name: 'test-baseline',
         // missing: supports, controls, groups, sha256
       };
 
@@ -106,5 +106,4 @@ describe('JSON Schema Validation', () => {
       expect(validate.errors).not.toBeNull();
     });
   });
-
 });
