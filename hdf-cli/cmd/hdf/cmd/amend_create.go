@@ -16,41 +16,57 @@ import (
 )
 
 func newAmendCreateCmd() *cobra.Command {
-	var outputPath string
+	var (
+		outputPath string
+		fromPath   string
+	)
 
 	cmd := &cobra.Command{
 		Use:   "create [results-file]",
-		Short: "Interactively create waivers or attestations",
-		Long: `Create an hdf-amendments document interactively.
+		Short: "Create waivers, attestations, and other amendments",
+		Long: `Create an hdf-amendments document, interactively or from a spec.
 
-If a results file is provided, requirements are listed for selection with their
-current status. Without a results file, requirement IDs are entered one at a time
-(standalone mode). Each selected requirement gets its own amendment details.
+Headless (non-interactive) mode — pass --from <spec.json|-> (or pipe a spec on
+stdin). The spec is a lean JSON array of override specs (or an envelope object
+with an overrides[] array). Each spec declares its "type" and that type's
+fields; create fills appliedAt, resolves expiresAt, chains previousChecksum,
+validates against the hdf-amendments schema, and writes a ready-to-apply file.
+Works for all override types (waiver, attestation, poam, inherited,
+falsePositive, riskAdjustment, operationalRequirement).
 
-Requires an interactive terminal. Use hdf amend apply for non-interactive workflows.
+Interactive mode — with a terminal and no --from, requirements from an optional
+results file are listed for selection (or IDs are entered one at a time in
+standalone mode), and each amendment's details are collected via prompts.
 Press Escape or Ctrl+C to cancel at any time.
 
-Expiration dates accept relative durations (30d, 3m, 6m, 1y) or absolute
-dates (YYYY-MM-DD). Dates in the past are rejected.
-
-Note: Ctrl+E opens $EDITOR for text fields. The editor used is controlled by
-the EDITOR environment variable (default: system editor).
+Expiration accepts relative durations (30d, 3m, 6m, 1y), a bare date
+(YYYY-MM-DD), or a full RFC3339 timestamp; relative/bare forms resolve to an
+absolute time at create.
 
 Examples:
-  hdf amend create results.json -o waivers.json
-  hdf amend create results.json
-  hdf amend create -o waivers.json                  # standalone mode`,
+  hdf amend create --from spec.json -o waivers.json   # headless from a spec file
+  cat spec.json | hdf amend create -o waivers.json    # headless from stdin
+  hdf amend create results.json -o waivers.json        # interactive, seeded by results
+  hdf amend create -o waivers.json                     # interactive, standalone`,
 		Args: cobra.MaximumNArgs(1),
 		RunE: func(_ *cobra.Command, args []string) error {
 			resultsPath := ""
 			if len(args) > 0 {
 				resultsPath = args[0]
 			}
+			// Headless when --from is given, or when stdin is not a terminal.
+			if fromPath != "" {
+				return runAmendCreateHeadless(fromPath, outputPath)
+			}
+			if !term.IsTerminal(int(os.Stdin.Fd())) { //nolint:gosec // G115: fd conversion is safe for stdin
+				return runAmendCreateHeadless("-", outputPath)
+			}
 			return runAmendCreate(resultsPath, outputPath)
 		},
 	}
 
 	cmd.Flags().StringVarP(&outputPath, "output", "o", "", "Output file (default: stdout)")
+	cmd.Flags().StringVar(&fromPath, "from", "", "Create headlessly from a spec file (\"-\" for stdin)")
 
 	return cmd
 }
@@ -325,7 +341,7 @@ func collectAmendmentDetails(reqID string) (*amendOverride, error) {
 		return nil, fmt.Errorf("form cancelled: %w", err)
 	}
 
-	expiresDate, _ := parseExpiryInput(expiresInput) // already validated
+	expiresDate, _ := parseExpiryInput(expiresInput, time.Now()) // already validated
 
 	ov := &amendOverride{
 		RequirementID: reqID,
@@ -409,20 +425,22 @@ func askAddAnother() (bool, error) {
 
 // validateExpiryInput validates that the input is a valid relative duration or future date.
 func validateExpiryInput(s string) error {
-	date, err := parseExpiryInput(s)
+	now := time.Now()
+	date, err := parseExpiryInput(s, now)
 	if err != nil {
 		return err
 	}
 	parsed, _ := time.Parse("2006-01-02", date)
-	if !parsed.After(time.Now()) {
+	if !parsed.After(now) {
 		return fmt.Errorf("expiration date must be in the future")
 	}
 	return nil
 }
 
 // parseExpiryInput converts a relative duration (30d, 3m, 6m, 1y) or absolute date
-// (YYYY-MM-DD) to an absolute YYYY-MM-DD string.
-func parseExpiryInput(input string) (string, error) {
+// (YYYY-MM-DD) to an absolute YYYY-MM-DD string. The now argument is the anchor
+// for relative durations — pass time.Now() at runtime; tests pass a fixed clock.
+func parseExpiryInput(input string, now time.Time) (string, error) {
 	input = strings.TrimSpace(input)
 	if input == "" {
 		return "", fmt.Errorf("expiration is required")
@@ -445,7 +463,6 @@ func parseExpiryInput(input string) (string, error) {
 		return "", fmt.Errorf("invalid format: use 30d, 3m, 1y, or YYYY-MM-DD")
 	}
 
-	now := time.Now()
 	var target time.Time
 	switch unit {
 	case 'd':
