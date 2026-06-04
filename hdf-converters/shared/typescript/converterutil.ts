@@ -7,13 +7,11 @@
  */
 
 import { sha256 } from '@mitre/hdf-utilities';
-import type { Checksum, Component, EvaluatedBaseline, HdfResults, Integrity, Statistics } from '@mitre/hdf-schema';
-import { Applicability, ControlType, HashAlgorithm, VerificationMethodEnum } from '@mitre/hdf-schema';
-import { getCweNistControl } from '@mitre/hdf-mappings';
+import type { Checksum, Component, EvaluatedBaseline, HDFResults, Integrity, Statistics } from '@mitre/hdf-schema';
+import { ControlType, HashAlgorithm, VerificationMethodEnum } from '@mitre/hdf-schema';
+import { getCweNistControl, DEFAULT_STATIC_ANALYSIS_NIST_TAGS } from '@mitre/hdf-mappings';
 
-// Re-export the v3.2 classification enums so converters can reach them from
-// the same import path used for every other shared converter utility.
-export { Applicability, ControlType, VerificationMethodEnum };
+export { DEFAULT_STATIC_ANALYSIS_NIST_TAGS };
 
 /**
  * Compute a SHA-256 checksum of raw converter input.
@@ -35,7 +33,7 @@ export async function inputChecksum(input: string): Promise<Checksum> {
  * Compute an Integrity object (for root-level document integrity) from raw input.
  *
  * Returns an Integrity with algorithm and checksum fields, suitable for
- * HdfBaseline.integrity, HdfSystem.integrity, HdfPlan.integrity, etc.
+ * HDFBaseline.integrity, HDFSystem.integrity, HDFPlan.integrity, etc.
  *
  * @param input - Raw input string (JSON, XML, etc.)
  * @returns Integrity object with SHA-256 algorithm and checksum
@@ -72,7 +70,7 @@ export function buildNistCciTags(
 }
 
 /** Maximum number of items processed from any single input array. */
-export const DEFAULT_MAX_ITEMS = 100_000;
+const DEFAULT_MAX_ITEMS = 100_000;
 
 /**
  * Limit an array to at most maxItems elements.
@@ -211,8 +209,6 @@ export function ensureArray<T>(value: T | T[] | undefined | null): T[] {
   return Array.isArray(value) ? value : [value];
 }
 
-// Re-export shared constants for converter convenience
-export { DEFAULT_STATIC_ANALYSIS_NIST_TAGS } from '@mitre/hdf-mappings';
 
 /**
  * Default NIST 800-53 fallback for tools that identify outdated packages or
@@ -252,13 +248,13 @@ export interface HdfResultsOptions {
  * Build an HDF Results document from options.
  *
  * Eliminates the repeated boilerplate of constructing generator, tool,
- * and assembling the top-level HdfResults in every converter. Mirrors
+ * and assembling the top-level HDFResults in every converter. Mirrors
  * the Go shared.BuildHDFResults() function.
  *
  * @returns JSON string of the HDF Results document (pretty-printed)
  */
 export function buildHdfResults(opts: HdfResultsOptions): string {
-  const hdf: HdfResults = {
+  const hdf: HDFResults = {
     baselines: opts.baselines,
     generator: {
       name: opts.generatorName,
@@ -339,7 +335,7 @@ const NIST_FAMILY_CONTROL_TYPE: Record<string, ControlType> = {
  *   deriveControlType("PM-2")      // ControlType.Management
  *   deriveControlType("SV-238196") // undefined            (not a NIST tag)
  */
-export function deriveControlType(nistTag: string): ControlType | undefined {
+function deriveControlType(nistTag: string): ControlType | undefined {
   const match = NIST_TAG_PATTERN.exec(nistTag.trim().toUpperCase());
   if (!match || match[1] === undefined || match[2] === undefined) return undefined;
   const family = match[1];

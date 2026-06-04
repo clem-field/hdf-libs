@@ -2,7 +2,7 @@ import { describe, it, expect, beforeAll, afterAll } from 'vitest';
 import { existsSync, readFileSync, renameSync, rmSync, writeFileSync } from 'fs';
 import { join } from 'path';
 import { bundleSchemas } from '../src/bundle-schemas';
-import { generateTypes, toOutputFilename } from '../src/generate-types';
+import { generateTypes } from '../src/generate-types';
 import { createIndex } from '../src/create-index';
 
 const DIST_DIR = join(__dirname, '..', 'dist');
@@ -24,62 +24,48 @@ describe('generate-types', () => {
     createIndex();
   });
 
-  describe('TypeScript output', () => {
+  describe('TypeScript output (combined hdf.ts)', () => {
     it('should create dist/ts directory', () => {
       expect(existsSync(join(DIST_DIR, 'ts'))).toBe(true);
     });
 
-    it('should create hdf-results.ts', () => {
-      expect(existsSync(join(DIST_DIR, 'ts', 'hdf-results.ts'))).toBe(true);
+    it('should create combined hdf.ts', () => {
+      expect(existsSync(join(DIST_DIR, 'ts', 'hdf.ts'))).toBe(true);
     });
 
-    it('should create hdf-baseline.ts', () => {
-      expect(existsSync(join(DIST_DIR, 'ts', 'hdf-baseline.ts'))).toBe(true);
+    it('should NOT create per-file outputs (eliminated to prevent nominal type conflicts)', () => {
+      expect(existsSync(join(DIST_DIR, 'ts', 'hdf-results.ts'))).toBe(false);
+      expect(existsSync(join(DIST_DIR, 'ts', 'hdf-baseline.ts'))).toBe(false);
+      expect(existsSync(join(DIST_DIR, 'ts', 'hdf-comparison.ts'))).toBe(false);
     });
 
-    it('should export interfaces in hdf-results.ts', () => {
-      const content = readFileSync(join(DIST_DIR, 'ts', 'hdf-results.ts'), 'utf-8');
+    it('should export interfaces in combined hdf.ts', () => {
+      const content = readFileSync(join(DIST_DIR, 'ts', 'hdf.ts'), 'utf-8');
       expect(content).toContain('export interface');
     });
 
-    it('should contain HdfResults type', () => {
-      const content = readFileSync(join(DIST_DIR, 'ts', 'hdf-results.ts'), 'utf-8');
-      expect(content).toMatch(/export interface.*HdfResults|HDF.*Results/i);
+    it('should contain HDFResults type in combined output', () => {
+      const content = readFileSync(join(DIST_DIR, 'ts', 'hdf.ts'), 'utf-8');
+      expect(content).toContain('export interface HDFResults');
     });
 
-    it('should create hdf-comparison.ts', () => {
-      expect(existsSync(join(DIST_DIR, 'ts', 'hdf-comparison.ts'))).toBe(true);
-    });
-
-    it('should create hdf-comparison.d.ts after index creation', () => {
-      // The .d.ts is created by createIndex() in afterAll, so we verify
-      // the .ts source exists here (the .d.ts test is in the index tests)
-      const tsFile = join(DIST_DIR, 'ts', 'hdf-comparison.ts');
-      expect(existsSync(tsFile)).toBe(true);
-    });
-
-    it('should export interfaces in hdf-comparison.ts', () => {
-      const content = readFileSync(join(DIST_DIR, 'ts', 'hdf-comparison.ts'), 'utf-8');
-      expect(content).toContain('export interface');
-    });
-
-    it('should contain HdfComparison type', () => {
-      const content = readFileSync(join(DIST_DIR, 'ts', 'hdf-comparison.ts'), 'utf-8');
-      expect(content).toMatch(/export interface.*HdfComparison/);
+    it('should contain HDFComparison type in combined output', () => {
+      const content = readFileSync(join(DIST_DIR, 'ts', 'hdf.ts'), 'utf-8');
+      expect(content).toContain('export interface HDFComparison');
     });
 
     it('should contain RequirementDiff type', () => {
-      const content = readFileSync(join(DIST_DIR, 'ts', 'hdf-comparison.ts'), 'utf-8');
+      const content = readFileSync(join(DIST_DIR, 'ts', 'hdf.ts'), 'utf-8');
       expect(content).toMatch(/RequirementDiff|Requirement_Diff/);
     });
 
     it('should contain ComparisonSummary type', () => {
-      const content = readFileSync(join(DIST_DIR, 'ts', 'hdf-comparison.ts'), 'utf-8');
+      const content = readFileSync(join(DIST_DIR, 'ts', 'hdf.ts'), 'utf-8');
       expect(content).toMatch(/ComparisonSummary|Comparison_Summary|Summary/);
     });
 
     it('should contain Source type', () => {
-      const content = readFileSync(join(DIST_DIR, 'ts', 'hdf-comparison.ts'), 'utf-8');
+      const content = readFileSync(join(DIST_DIR, 'ts', 'hdf.ts'), 'utf-8');
       expect(content).toMatch(/Source/);
     });
   });
@@ -108,9 +94,9 @@ describe('generate-types', () => {
       expect(content).toContain('type');
       expect(content).toContain('struct');
       // Should contain types from all three schemas
-      expect(content).toMatch(/HDFResults|HdfResults/);
-      expect(content).toMatch(/HDFBaseline|HdfBaseline/);
-      expect(content).toMatch(/HDFComparison|HdfComparison/);
+      expect(content).toMatch(/HDFResults|HDFResults/);
+      expect(content).toMatch(/HDFBaseline|HDFBaseline/);
+      expect(content).toMatch(/HDFComparison|HDFComparison/);
     });
 
     it('should add omitempty tags to optional pointer fields', () => {
@@ -155,19 +141,6 @@ describe('generate-types', () => {
     });
   });
 
-  describe('toOutputFilename', () => {
-    it('should convert hyphens to underscores for Go output', () => {
-      // Exercises the ext === 'go' branch (line 41)
-      expect(toOutputFilename('hdf-results.schema.json', 'go')).toBe('hdf_results.go');
-      expect(toOutputFilename('hdf-evidence-package.schema.json', 'go')).toBe('hdf_evidence_package.go');
-    });
-
-    it('should preserve hyphens for TypeScript output', () => {
-      expect(toOutputFilename('hdf-results.schema.json', 'ts')).toBe('hdf-results.ts');
-      expect(toOutputFilename('hdf-baseline.schema.json', 'ts')).toBe('hdf-baseline.ts');
-    });
-  });
-
   describe('output directory creation', () => {
     it('should create output directories when they do not exist', async () => {
       // Delete output dirs to exercise the `!existsSync(outputDir)` true branch
@@ -186,7 +159,7 @@ describe('generate-types', () => {
       // Dirs should now exist with generated content
       expect(existsSync(tsDir)).toBe(true);
       expect(existsSync(goDir)).toBe(true);
-      expect(existsSync(join(tsDir, 'hdf-results.ts'))).toBe(true);
+      expect(existsSync(join(tsDir, 'hdf.ts'))).toBe(true);
       expect(existsSync(join(goDir, 'hdf.go'))).toBe(true);
     });
   });
@@ -233,30 +206,20 @@ describe('generate-types', () => {
       }
     });
 
-    it('should skip individual TS schemas that cause quicktype to error', { timeout: 30_000 }, async () => {
-      // Replace one bundled schema with content that quicktype cannot process,
-      // exercising the per-file error catch at line 325.
+    it('should throw when a schema causes quicktype to error (fail fast)', { timeout: 30_000 }, async () => {
       const schemaFile = join(SCHEMAS_DIR, 'hdf-comparison.schema.json');
-      const backupFile = join(SCHEMAS_DIR, 'hdf-comparison.schema.json.bak');
       const original = readFileSync(schemaFile, 'utf-8');
 
-      writeFileSync(backupFile, original);
-
       try {
-        // Write a schema that will fail quicktype (recursive $ref with no base case)
         writeFileSync(schemaFile, JSON.stringify({
           $schema: 'https://json-schema.org/draft/2020-12/schema',
           $id: 'https://mitre.github.io/hdf-libs/schemas/hdf-comparison/v1.0.0',
           type: 'INVALID_TYPE',
         }));
 
-        // generateTypes should not throw — it catches per-file errors
-        await expect(generateTypes()).resolves.not.toThrow();
+        await expect(generateTypes()).rejects.toThrow();
       } finally {
-        // Restore original schema
         writeFileSync(schemaFile, original);
-        if (existsSync(backupFile)) rmSync(backupFile);
-        // Regenerate to restore clean state
         await generateTypes();
       }
     });

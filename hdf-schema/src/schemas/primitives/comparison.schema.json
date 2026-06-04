@@ -122,6 +122,7 @@
       "properties": {
         "op": {
           "type": "string",
+          "title": "Op",
           "enum": [
             "add",
             "remove",
@@ -485,6 +486,7 @@
         },
         "state": {
           "type": "string",
+          "title": "Baseline Diff State",
           "enum": [
             "new",
             "absent",
@@ -523,6 +525,7 @@
         },
         "state": {
           "type": "string",
+          "title": "Baseline Diff State",
           "enum": [
             "new",
             "absent",
@@ -532,10 +535,18 @@
           "description": "The state of this component in the comparison."
         },
         "before": {
-          "description": "Component snapshot from the old system document."
+          "oneOf": [
+            { "$ref": "https://mitre.github.io/hdf-libs/schemas/primitives/component/v3.2.0#/$defs/Component" },
+            { "type": "null" }
+          ],
+          "description": "Component snapshot from the old system document. Null when state is 'new'."
         },
         "after": {
-          "description": "Component snapshot from the new system document."
+          "oneOf": [
+            { "$ref": "https://mitre.github.io/hdf-libs/schemas/primitives/component/v3.2.0#/$defs/Component" },
+            { "type": "null" }
+          ],
+          "description": "Component snapshot from the new system document. Null when state is 'absent'."
         },
         "fieldChanges": {
           "type": "array",
@@ -566,6 +577,7 @@
         },
         "state": {
           "type": "string",
+          "title": "Package Diff State",
           "enum": [
             "added",
             "removed",

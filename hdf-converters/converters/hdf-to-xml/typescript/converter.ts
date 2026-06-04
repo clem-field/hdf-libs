@@ -1,5 +1,5 @@
 import { parseJSON, buildXml } from '@mitre/hdf-utilities';
-import type { HdfResults, EvaluatedRequirement, Description, RequirementResult } from '@mitre/hdf-schema';
+import type { HDFResults, EvaluatedBaseline, EvaluatedRequirement, Component, Description, RequirementResult } from '@mitre/hdf-schema';
 import { validateInputSize } from '../../../shared/typescript/converterutil.js';
 
 /**
@@ -9,7 +9,7 @@ import { validateInputSize } from '../../../shared/typescript/converterutil.js';
  */
 export function convertHdfToXml(input: string): string {
   validateInputSize(input, 'hdf-to-xml');
-  const hdf = parseJSON<HdfResults>(input);
+  const hdf = parseJSON<HDFResults>(input);
 
   if (!hdf || typeof hdf !== 'object' || !('baselines' in hdf)) {
     throw new Error('Invalid HDF structure: missing baselines field');
@@ -38,13 +38,13 @@ function wrap(value: string | number | boolean): { '#text': string | number | bo
  * Transform HDF object to XML-compatible structure
  * Converts arrays to repeated singular elements
  */
-function transformHdfToXmlObject(hdf: HdfResults): Record<string, unknown> {
+function transformHdfToXmlObject(hdf: HDFResults): Record<string, unknown> {
   const result: Record<string, unknown> = {};
 
   // Transform baselines array
   if (hdf.baselines && hdf.baselines.length > 0) {
     result.baselines = {
-      baseline: hdf.baselines.map(baseline => ({
+      baseline: hdf.baselines.map((baseline: EvaluatedBaseline) => ({
         name: wrap(baseline.name),
         ...(baseline.version && { version: wrap(baseline.version) }),
         ...(baseline.title && { title: wrap(baseline.title) }),
@@ -56,7 +56,7 @@ function transformHdfToXmlObject(hdf: HdfResults): Record<string, unknown> {
         }),
         ...(baseline.requirements && baseline.requirements.length > 0 && {
           requirements: {
-            requirement: baseline.requirements.map(req => transformRequirement(req))
+            requirement: baseline.requirements.map((req: EvaluatedRequirement) => transformRequirement(req))
           }
         }),
         ...(baseline.requirements && baseline.requirements.length === 0 && {
@@ -71,7 +71,7 @@ function transformHdfToXmlObject(hdf: HdfResults): Record<string, unknown> {
   // Transform components array
   if (hdf.components && hdf.components.length > 0) {
     result.components = {
-      target: hdf.components.map(target => ({
+      target: hdf.components.map((target: Component) => ({
         name: wrap(target.name),
         type: wrap(target.type),
         ...(target.fqdn && { fqdn: wrap(target.fqdn) }),

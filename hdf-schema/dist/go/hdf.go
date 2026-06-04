@@ -253,7 +253,7 @@ type Input struct {
 	// The data type of this input.                                                                                
 	Type                                                                                       *InputType          `json:"type,omitempty"`
 	// The input value. Type should match the declared type field. Accepts any JSON value.                         
-	Value interface{} `json:"value,omitempty"`
+	Value                                                                                      interface{}         `json:"value,omitempty"`
 }
 
 // Validation constraints for the input value.
@@ -606,15 +606,15 @@ type Evidence struct {
 //
 // Identity of who prepared this evidence package.
 type Identity struct {
-	// Optional description of the identity or identity system, particularly useful when type is          
-	// 'other'.                                                                                           
-	Description                                                                                 *string   `json:"description,omitempty"`
-	// The identifier value. Example: 'user@example.com', 'jdoe', 'automated-scanner-01'.                 
-	Identifier                                                                                  string    `json:"identifier"`
-	// The type of identifier. Use 'email' for email addresses, 'username' for user accounts,             
-	// 'system' for automated systems, 'simple' for basic string identifiers without additional           
-	// classification, or 'other' for custom identity systems.                                            
-	Type                                                                                        OwnerType `json:"type"`
+	// Optional description of the identity or identity system, particularly useful when type is             
+	// 'other'.                                                                                              
+	Description                                                                                 *string      `json:"description,omitempty"`
+	// The identifier value. Example: 'user@example.com', 'jdoe', 'automated-scanner-01'.                    
+	Identifier                                                                                  string       `json:"identifier"`
+	// The type of identifier. Use 'email' for email addresses, 'username' for user accounts,                
+	// 'system' for automated systems, 'simple' for basic string identifiers without additional              
+	// classification, or 'other' for custom identity systems.                                               
+	Type                                                                                        IdentityType `json:"type"`
 }
 
 // CISA Known Exploited Vulnerabilities (KEV) catalog status. When inKev=true, dateAdded and
@@ -661,21 +661,21 @@ type PoamElement struct {
 	// The type of POA&M. 'remediation' fixes root cause. 'mitigation' reduces risk via                    
 	// compensating controls. 'riskAcceptance' documents decision to accept risk.                          
 	// 'vendorDependency' tracks a fix that depends on a vendor releasing a patch or update.               
-	Type                                                                                       PoamType    `json:"type"`
+	Type                                                                                       POAMType    `json:"type"`
 }
 
 // A milestone or task within a POA&M remediation plan.
 type Milestone struct {
-	// Actual completion timestamp. ISO 8601 format.           
-	CompletedAt                                     *time.Time `json:"completedAt,omitempty"`
-	// Identity of who completed this milestone.               
-	CompletedBy                                     *Identity  `json:"completedBy,omitempty"`
-	// Description of this milestone or task.                  
-	Description                                     string     `json:"description"`
-	// Estimated completion date. ISO 8601 format.             
-	EstimatedCompletion                             time.Time  `json:"estimatedCompletion"`
-	// Current status of this milestone.                       
-	Status                                          Status     `json:"status"`
+	// Actual completion timestamp. ISO 8601 format.                
+	CompletedAt                                     *time.Time      `json:"completedAt,omitempty"`
+	// Identity of who completed this milestone.                    
+	CompletedBy                                     *Identity       `json:"completedBy,omitempty"`
+	// Description of this milestone or task.                       
+	Description                                     string          `json:"description"`
+	// Estimated completion date. ISO 8601 format.                  
+	EstimatedCompletion                             time.Time       `json:"estimatedCompletion"`
+	// Current status of this milestone.                            
+	Status                                          MilestoneStatus `json:"status"`
 }
 
 // Optional digital signature for enhanced trust and non-repudiation.
@@ -743,7 +743,7 @@ type VerificationMethod struct {
 //
 // A URI pointing at the reference.
 type Reference struct {
-	Ref *Ref `json:"ref,omitempty"`
+	Ref *Ref    `json:"ref,omitempty"`
 	URL *string `json:"url,omitempty"`
 	URI *string `json:"uri,omitempty"`
 }
@@ -893,9 +893,9 @@ type Component struct {
 	Owner                                                                                       *Identity         `json:"owner,omitempty"`
 	// Embedded CycloneDX or SPDX SBOM document representing this component's software                            
 	// inventory. The sbomFormat field determines which format constraints apply.                                 
-	Sbom interface{} `json:"sbom,omitempty"`
+	Sbom                                                                                        interface{}       `json:"sbom,omitempty"`
 	// Format of the SBOM (embedded or referenced). Required when sbom or sbomRef is present.                     
-	SbomFormat                                                                                  *SbomFormat       `json:"sbomFormat,omitempty"`
+	SbomFormat                                                                                  *SBOMFormat       `json:"sbomFormat,omitempty"`
 	// URI reference to an external CycloneDX or SPDX SBOM document for this component. May be a                  
 	// relative path, absolute URI, or fragment identifier.                                                       
 	SbomRef                                                                                     *string           `json:"sbomRef,omitempty"`
@@ -903,7 +903,7 @@ type Component struct {
 	// with matching labels are automatically included.                                                           
 	TargetSelector                                                                              map[string]string `json:"targetSelector,omitempty"`
 	// Component type discriminator. Same values as Target types.                                                 
-	Type                                                                                        Copyright         `json:"type"`
+	Type                                                                                        TargetType        `json:"type"`
 	// Fully qualified domain name.                                                                               
 	FQDN                                                                                        *string           `json:"fqdn,omitempty"`
 	// IP address of the host.                                                                                    
@@ -947,7 +947,7 @@ type Component struct {
 	// Cloud account identifier.                                                                                  
 	AccountID                                                                                   *string           `json:"accountId,omitempty"`
 	// Cloud provider.                                                                                            
-	Provider *CloudProvider `json:"provider,omitempty"`
+	Provider                                                                                    *CloudProvider    `json:"provider,omitempty"`
 	// Cloud region, if applicable.                                                                               
 	//                                                                                                            
 	// Cloud region where the resource resides.                                                                   
@@ -999,7 +999,7 @@ type InputOverride struct {
 	// Rationale for why this override is needed.                                                          
 	Justification                                                                              *string     `json:"justification,omitempty"`
 	// The overridden value. Should match the type of the original input.                                  
-	Value interface{} `json:"value,omitempty"`
+	Value                                                                                      interface{} `json:"value"`
 }
 
 // Information about the tool that generated this file.
@@ -1296,10 +1296,10 @@ type BaselineDiff struct {
 
 // Comparison of a single component between two system document versions.
 type ComponentDiff struct {
-	// Component snapshot from the new system document.                                                
-	After interface{} `json:"after,omitempty"`
-	// Component snapshot from the old system document.                                                
-	Before interface{} `json:"before,omitempty"`
+	// Component snapshot from the new system document. Null when state is 'absent'.                   
+	After                                                                            interface{}       `json:"after,omitempty"`
+	// Component snapshot from the old system document. Null when state is 'new'.                      
+	Before                                                                           interface{}       `json:"before,omitempty"`
 	// Detailed field-level changes between the before and after component snapshots.                  
 	FieldChanges                                                                     []FieldChange     `json:"fieldChanges,omitempty"`
 	// Component name used for matching across system versions.                                        
@@ -1311,9 +1311,9 @@ type ComponentDiff struct {
 // A single field-level change between two versions of a requirement.
 type FieldChange struct {
 	// The new value of the field (for 'add' and 'replace' operations).                    
-	NewValue interface{} `json:"newValue,omitempty"`
+	NewValue                                                                   interface{} `json:"newValue,omitempty"`
 	// The previous value of the field (for 'remove' and 'replace' operations).            
-	OldValue interface{} `json:"oldValue,omitempty"`
+	OldValue                                                                   interface{} `json:"oldValue,omitempty"`
 	// The type of change operation.                                                       
 	Op                                                                         Op          `json:"op"`
 	// JSON Pointer path to the changed field.                                             
@@ -1324,13 +1324,13 @@ type FieldChange struct {
 // before/after snapshots.
 type RequirementDiff struct {
 	// The requirement as it appeared in the new source. Null when state is 'absent'.                                   
-	After interface{} `json:"after,omitempty"`
+	After                                                                                        interface{}            `json:"after"`
 	// Sensitive data from the new source that should not be included in the main after snapshot.                       
 	AfterSensitive                                                                               map[string]interface{} `json:"afterSensitive,omitempty"`
 	// IDs of annotations attached to this requirement diff.                                                            
 	AnnotationIDS                                                                                []string               `json:"annotationIds,omitempty"`
 	// The requirement as it appeared in the old/reference source. Null when state is 'new'.                            
-	Before interface{} `json:"before,omitempty"`
+	Before                                                                                       interface{}            `json:"before"`
 	// Sensitive data from the old source that should not be included in the main before                                
 	// snapshot.                                                                                                        
 	BeforeSensitive                                                                              map[string]interface{} `json:"beforeSensitive,omitempty"`
@@ -1386,7 +1386,7 @@ type Value struct {
 	// Human-readable label for the source.                                    
 	SourceLabel                                                    string      `json:"sourceLabel"`
 	// The value reported by this source for the conflicting field.            
-	Value interface{} `json:"value,omitempty"`
+	Value                                                          interface{} `json:"value"`
 }
 
 // Configuration for how requirements were matched across sources.
@@ -1649,7 +1649,7 @@ type DataFlow struct {
 	Protocol                                                                                    *string     `json:"protocol,omitempty"`
 	// The other end of this data flow. Can be a local component (UUID), a cross-system                     
 	// component reference, or an external endpoint.                                                        
-	To interface{} `json:"to,omitempty"`
+	To                                                                                          interface{} `json:"to"`
 }
 
 // Defines an assessment plan — what baselines to run against which targets, with resolved
@@ -1763,9 +1763,18 @@ type HDFAmendments struct {
 	Version                                                                                   *string              `json:"version,omitempty"`
 }
 
-// A standalone amendment that modifies a requirement's compliance status and/or impact
-// score. At least one of status or impact must be set. Extends the inline Override concept
-// with requirementId and baselineRef for use outside of results documents.
+// A standalone override to a requirement's compliance status or risk impact. Validation has
+// two branches gated on 'type': when type is 'operationalRequirement', neither 'status' nor
+// 'impact' may be set — the override records accepted risk without changing the finding
+// (documentation-only). For all other types, at least one of 'status' or 'impact' must be
+// set. This rule aligns with: (1) OSCAL Assessment Results — finding.target.status and
+// finding.associated-risk[].facet[] are separate axes
+// (https://pages.nist.gov/OSCAL/learn/concepts/layer/assessment/assessment-results/); (2)
+// FedRAMP deviation request types — Risk Adjustment changes impact only, Operational
+// Requirement documents acceptance only, False Positive changes status
+// (https://www.ignyteplatform.com/blog/fedramp/fedramp-deviation-requests-submit/); (3)
+// NIST SP 800-37 RMF — risk response (accept/mitigate/transfer) is a separate step from
+// control assessment status (https://csrc.nist.gov/pubs/sp/800/37/r2/final).
 type StandaloneOverride struct {
 	// When this amendment was applied. ISO 8601 format.                                                        
 	AppliedAt                                                                                   time.Time       `json:"appliedAt"`
@@ -2076,47 +2085,47 @@ const (
 // The type of identifier. Use 'email' for email addresses, 'username' for user accounts,
 // 'system' for automated systems, 'simple' for basic string identifiers without additional
 // classification, or 'other' for custom identity systems.
-type OwnerType string
+type IdentityType string
 
 const (
-	Email       OwnerType = "email"
-	PurpleOther OwnerType = "other"
-	Simple      OwnerType = "simple"
-	TypeSystem  OwnerType = "system"
-	Username    OwnerType = "username"
+	Email              IdentityType = "email"
+	IdentityTypeOther  IdentityType = "other"
+	IdentityTypeSystem IdentityType = "system"
+	Simple             IdentityType = "simple"
+	Username           IdentityType = "username"
 )
 
 // The type of evidence being provided.
 type EvidenceType string
 
 const (
-	Code        EvidenceType = "code"
-	File        EvidenceType = "file"
-	FluffyOther EvidenceType = "other"
-	Log         EvidenceType = "log"
-	Screenshot  EvidenceType = "screenshot"
-	URL         EvidenceType = "url"
+	Code              EvidenceType = "code"
+	EvidenceTypeOther EvidenceType = "other"
+	File              EvidenceType = "file"
+	Log               EvidenceType = "log"
+	Screenshot        EvidenceType = "screenshot"
+	URL               EvidenceType = "url"
 )
 
 // Current status of this milestone.
-type Status string
+type MilestoneStatus string
 
 const (
-	Completed  Status = "completed"
-	InProgress Status = "inProgress"
-	Pending    Status = "pending"
+	Completed  MilestoneStatus = "completed"
+	InProgress MilestoneStatus = "inProgress"
+	Pending    MilestoneStatus = "pending"
 )
 
 // The type of POA&M. 'remediation' fixes root cause. 'mitigation' reduces risk via
 // compensating controls. 'riskAcceptance' documents decision to accept risk.
 // 'vendorDependency' tracks a fix that depends on a vendor releasing a patch or update.
-type PoamType string
+type POAMType string
 
 const (
-	Mitigation       PoamType = "mitigation"
-	RiskAcceptance   PoamType = "riskAcceptance"
-	TypeRemediation  PoamType = "remediation"
-	VendorDependency PoamType = "vendorDependency"
+	Mitigation          POAMType = "mitigation"
+	POAMTypeRemediation POAMType = "remediation"
+	RiskAcceptance      POAMType = "riskAcceptance"
+	VendorDependency    POAMType = "vendorDependency"
 )
 
 // Explicit severity rating. Typically derived from impact score but provided explicitly for
@@ -2166,30 +2175,28 @@ const (
 )
 
 // Format of the SBOM (embedded or referenced). Required when sbom or sbomRef is present.
-type SbomFormat string
+type SBOMFormat string
 
 const (
-	Cyclonedx SbomFormat = "cyclonedx"
-	Spdx      SbomFormat = "spdx"
+	Cyclonedx SBOMFormat = "cyclonedx"
+	Spdx      SBOMFormat = "spdx"
 )
 
-// A human readable/meaningful reference. Example: a book title.
-//
-// IP address of the host.
-type Copyright string
+// Component type discriminator. Same values as Target types.
+type TargetType string
 
 const (
-	Application       Copyright = "application"
-	Artifact          Copyright = "artifact"
-	CloudAccount      Copyright = "cloudAccount"
-	CloudResource     Copyright = "cloudResource"
-	ContainerImage    Copyright = "containerImage"
-	ContainerInstance Copyright = "containerInstance"
-	ContainerPlatform Copyright = "containerPlatform"
-	Database          Copyright = "database"
-	Host              Copyright = "host"
-	Network           Copyright = "network"
-	Repository        Copyright = "repository"
+	Application       TargetType = "application"
+	Artifact          TargetType = "artifact"
+	CloudAccount      TargetType = "cloudAccount"
+	CloudResource     TargetType = "cloudResource"
+	ContainerImage    TargetType = "containerImage"
+	ContainerInstance TargetType = "containerInstance"
+	ContainerPlatform TargetType = "containerPlatform"
+	Database          TargetType = "database"
+	Host              TargetType = "host"
+	Network           TargetType = "network"
+	Repository        TargetType = "repository"
 )
 
 // The category of this annotation.
@@ -2211,10 +2218,10 @@ const (
 type BaselineDiffState string
 
 const (
-	PurpleUnchanged BaselineDiffState = "unchanged"
-	PurpleUpdated   BaselineDiffState = "updated"
-	StateAbsent     BaselineDiffState = "absent"
-	StateNew        BaselineDiffState = "new"
+	BaselineDiffStateAbsent    BaselineDiffState = "absent"
+	BaselineDiffStateNew       BaselineDiffState = "new"
+	BaselineDiffStateUnchanged BaselineDiffState = "unchanged"
+	BaselineDiffStateUpdated   BaselineDiffState = "updated"
 )
 
 // The mode of comparison being performed.
@@ -2323,10 +2330,10 @@ const (
 type PackageDiffState string
 
 const (
-	Added           PackageDiffState = "added"
-	FluffyUnchanged PackageDiffState = "unchanged"
-	FluffyUpdated   PackageDiffState = "updated"
-	Removed         PackageDiffState = "removed"
+	Added                     PackageDiffState = "added"
+	PackageDiffStateUnchanged PackageDiffState = "unchanged"
+	PackageDiffStateUpdated   PackageDiffState = "updated"
+	Removed                   PackageDiffState = "removed"
 )
 
 // The original format of the source document before conversion to HDF.
@@ -2557,8 +2564,3 @@ func marshalUnion(pi *int64, pf *float64, pb *bool, ps *string, haveArray bool, 
 	}
 	return nil, errors.New("Union must not be null")
 }
-
-// Backward-compatible aliases for renamed constants.
-const (
-	CopyrightApplication = Application
-)

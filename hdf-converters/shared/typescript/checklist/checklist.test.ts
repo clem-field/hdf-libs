@@ -1,5 +1,5 @@
 import { describe, it, expect } from 'vitest';
-import type { HdfResults } from '@mitre/hdf-schema';
+import type { HDFResults } from '@mitre/hdf-schema';
 import { CheckStatus, Checklist } from './model.js';
 import {
   parseStatus,
@@ -101,6 +101,11 @@ describe('checklist shared model', () => {
     expect(parseStatus(undefined)).toBe(CheckStatus.NotReviewed);
   });
 
+  it('statusToCkl falls back to Not_Reviewed for falsy input', () => {
+    expect(statusToCkl('' as CheckStatus)).toBe(CheckStatus.NotReviewed);
+    expect(statusToCkl(undefined as unknown as CheckStatus)).toBe(CheckStatus.NotReviewed);
+  });
+
   it('parses CKL and CKLB to equivalent models', () => {
     const ckl = parseCkl(SAMPLE_CKL);
     const cklb = parseCklb(SAMPLE_CKLB);
@@ -189,7 +194,7 @@ describe('checklist shared model', () => {
   });
 
   it('synthesizes a valid checklist from arbitrary HDF (nist->cci, defaults)', () => {
-    const hdf: HdfResults = {
+    const hdf: HDFResults = {
       baselines: [
         {
           name: 'Some Scan',
@@ -206,7 +211,7 @@ describe('checklist shared model', () => {
           ],
         },
       ],
-    } as unknown as HdfResults;
+    } as unknown as HDFResults;
     const cl = hdfToChecklist(JSON.stringify(hdf));
     const v = cl.stigs[0].vulns[0];
     expect(v.vulnNum).toBe('GEN-001');

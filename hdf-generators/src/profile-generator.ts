@@ -1,4 +1,4 @@
-import type { HdfBaseline } from '@mitre/hdf-schema';
+import type { BaselineRequirement, HDFBaseline } from '@mitre/hdf-schema';
 import type { GeneratorOptions, InSpecProfile } from './types.js';
 import { generateControlStub } from './control-stub.js';
 import { generateInSpecYml } from './inspec-yml.js';
@@ -11,7 +11,7 @@ import { generateInSpecYml } from './inspec-yml.js';
  * is responsible for writing files to disk.
  */
 export function generateInSpecProfile(
-  baseline: HdfBaseline,
+  baseline: HDFBaseline,
   options?: GeneratorOptions,
 ): InSpecProfile {
   const inspecYml = generateInSpecYml(baseline, options);
@@ -23,7 +23,7 @@ export function generateInSpecProfile(
 
   if (options?.singleFile) {
     // All controls in a single file
-    const stubs = baseline.requirements.map((req) => generateControlStub(req));
+    const stubs = baseline.requirements.map((req: BaselineRequirement) => generateControlStub(req));
     controls.set('controls/controls.rb', stubs.join('\n'));
   } else {
     // One file per control — sanitize ID for safe filenames

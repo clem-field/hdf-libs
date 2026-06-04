@@ -82,23 +82,19 @@ export interface CreateIndexOptions {
 export function createIndex(options: CreateIndexOptions = {}): void {
   // Check if TypeScript files exist before compiling
   const tsDir = join(ROOT_DIR, 'dist/ts');
-  const resultsTs = join(tsDir, 'hdf-results.ts');
-  const baselineTs = join(tsDir, 'hdf-baseline.ts');
-  const comparisonTs = join(tsDir, 'hdf-comparison.ts');
+  const combinedTs = join(tsDir, 'hdf.ts');
 
-  if (!existsSync(resultsTs) || !existsSync(baselineTs)) {
+  if (!existsSync(combinedTs)) {
     // eslint-disable-next-line no-console
-    console.warn('Skipping index creation: TypeScript files not found');
+    console.warn('Skipping index creation: dist/ts/hdf.ts not found');
     return;
   }
 
-  // Clean stale .d.ts and .js output so tsc doesn't refuse to overwrite its own input
-  for (const name of ['hdf-results', 'hdf-baseline', 'hdf-comparison', 'hdf-system', 'hdf-plan', 'hdf-amendments', 'hdf-evidence-package']) {
-    for (const ext of ['.d.ts', '.js']) {
-      const file = join(tsDir, `${name}${ext}`);
-      if (existsSync(file)) {
-        rmSync(file);
-      }
+  // Clean compiled output so tsc doesn't refuse to overwrite its own input
+  for (const ext of ['.d.ts', '.js']) {
+    const file = join(tsDir, `hdf${ext}`);
+    if (existsSync(file)) {
+      rmSync(file);
     }
   }
 
@@ -110,9 +106,6 @@ export function createIndex(options: CreateIndexOptions = {}): void {
     const tsFiles = readdirSync(tsDir)
       .filter(f => f.endsWith('.ts') && !f.endsWith('.d.ts'))
       .map(f => join('dist/ts', f));
-    if (tsFiles.length === 0) {
-      throw new Error('No .ts files found in dist/ts/');
-    }
     // Write a temporary tsconfig to avoid TS6's TS5112 error when passing
     // files on the command line alongside an existing tsconfig.json.
     const tmpConfig = join(cwd, 'tsconfig.dist-types.json');
@@ -145,39 +138,12 @@ export function createIndex(options: CreateIndexOptions = {}): void {
   const helpersJs = join(ROOT_DIR, 'src/helpers.js');
   const helpersDts = join(ROOT_DIR, 'src/helpers.d.ts');
 
-  if (existsSync(helpersJs)) {
-    copyFileSync(helpersJs, join(ROOT_DIR, 'dist/helpers.js'));
-  }
-  if (existsSync(helpersDts)) {
-    copyFileSync(helpersDts, join(ROOT_DIR, 'dist/helpers.d.ts'));
-  }
-
-  // Determine if comparison types are available
-  const hasComparison = existsSync(comparisonTs);
-
-  // index.d.ts uses named type exports (valid in declaration files)
-  // No export * from hdf-comparison — its shared types (Checksum, Target, Severity, etc.)
-  // duplicate hdf-results and cause ambiguous-export collisions.
-  // Only export comparison-unique types.
-  const comparisonDtsExport = hasComparison
-    ? `
-// Re-export comparison-specific types (interfaces and enums not in hdf-results).
-// No export * from hdf-comparison — shared types duplicate hdf-results.
-export type {
-  HdfComparison, RequirementDiff, ComparisonSummary, Source,
-  Annotation, BaselineDiff, BaselineRef, ComponentDiff, FieldChange, MatchingConfig,
-  PackageDiff, ScannerConflict, SeverityBreakdown, StateCounts, PerSourceSummary,
-  Value,
-} from './ts/hdf-comparison.js';
-export {
-  AnnotationCategory, BaselineDiffState, ChangeReason, ComparisonMode,
-  ConflictResolution, FormatVersion, MatchStrategy, Op, OriginalFormat,
-  PackageDiffState, RequirementState, SourceRole, Type,
-} from './ts/hdf-comparison.js';
-`
-    : '';
+  copyFileSync(helpersJs, join(ROOT_DIR, 'dist/helpers.js'));
+  copyFileSync(helpersDts, join(ROOT_DIR, 'dist/helpers.d.ts'));
 
   const schemaExports = generateSchemaExports(ROOT_DIR);
+
+  const primarySource = './ts/hdf.js';
 
   const indexDtsContent = `/**
  * Main entry point for @mitre/hdf-schema
@@ -189,63 +155,35 @@ export {
 // individually with their JSON Schema validator to resolve cross-refs).
 ${schemaExports.dts}
 
-// Re-export all types from hdf-results (includes most common types)
-export * from './ts/hdf-results.js';
-
-// Re-export baseline-only types (interfaces not in hdf-results).
-// No export * from hdf-baseline — its enums (HashAlgorithm, Severity) duplicate
-// hdf-results and cause ambiguous-export collisions.
-export type { HdfBaseline, BaselineRequirement } from './ts/hdf-baseline.js';
-${comparisonDtsExport}
-// Re-export system types
-// No Component re-export — it's already exported by hdf-results.js via export *
-export type {
-  HdfSystem, InputOverride, ControlDesignation, DataFlow,
-} from './ts/hdf-system.js';
-export {
-  AuthorizationStatus, BoundaryDescription, CategorizationLevel, Designation, Direction,
-} from './ts/hdf-system.js';
-
-// Re-export plan types
-export type {
-  HdfPlan, Assessment, Schedule, RunnerConfig,
-} from './ts/hdf-plan.js';
-export {
-  PlanType,
-} from './ts/hdf-plan.js';
-
-// Re-export amendments types
-// No OverrideType enum — already exported by hdf-results via export *.
-export type {
-  HdfAmendments, StandaloneOverride,
-} from './ts/hdf-amendments.js';
-
-// Re-export evidence-package types
-export type {
-  HdfEvidencePackage, ContentReference, CompletenessCheck, SBOMCoverage,
-} from './ts/hdf-evidence-package.js';
-export {
-  ContentType,
-} from './ts/hdf-evidence-package.js';
+// When combined hdf.ts is available, ALL types from all 7 schemas are in
+// that single file. No per-file re-exports — mixing module paths causes
+// TypeScript nominal type incompatibility (same interface from different
+// .d.ts files are not assignable to each other).
+export * from '${primarySource}';
 
 // Re-export helper functions
 export * from './helpers.js';
+
+// ── Deprecated aliases for backward compatibility ──
+// These will be removed in the next major version.
+// Consumers should migrate to HDF* naming (matching schema titles).
+/** @deprecated Use HDFResults */
+export type HdfResults = HDFResults;
+/** @deprecated Use HDFBaseline */
+export type HdfBaseline = HDFBaseline;
+/** @deprecated Use HDFComparison */
+export type HdfComparison = HDFComparison;
+/** @deprecated Use HDFSystem */
+export type HdfSystem = HDFSystem;
+/** @deprecated Use HDFPlan */
+export type HdfPlan = HDFPlan;
+/** @deprecated Use HDFAmendments */
+export type HdfAmendments = HDFAmendments;
+/** @deprecated Use HDFEvidencePackage */
+export type HdfEvidencePackage = HDFEvidencePackage;
 `;
 
-  // index.js uses only export * (named exports of type-only symbols crash Node ESM).
-  // hdf-baseline.js only contains enums (HashAlgorithm, Severity) that are already
-  // exported by hdf-results.js, so we skip it to avoid ESM ambiguous-export collisions.
-  // hdf-comparison.js has overlapping enums too, so we use named exports for unique enums only.
-  const comparisonJsExport = hasComparison
-    ? `
-// Re-export comparison-specific enums (runtime values not in hdf-results)
-export {
-  AnnotationCategory, BaselineDiffState, ChangeReason, ComparisonMode,
-  ConflictResolution, FormatVersion, MatchStrategy, Op, OriginalFormat,
-  PackageDiffState, RequirementState, SourceRole, Type,
-} from './ts/hdf-comparison.js';
-`
-    : '';
+
 
   const indexJsContent = `/**
  * Main entry point for @mitre/hdf-schema
@@ -257,25 +195,10 @@ export {
 // individually with their JSON Schema validator to resolve cross-refs).
 ${schemaExports.js}
 
-// Re-export all values from hdf-results (enums like ResultStatus, HashAlgorithm, Severity)
-export * from './ts/hdf-results.js';
-${comparisonJsExport}
-// Re-export system enums (runtime values)
-export {
-  AuthorizationStatus, BoundaryDescription, CategorizationLevel, Designation, Direction,
-} from './ts/hdf-system.js';
-
-// Re-export plan enums (runtime values)
-export {
-  PlanType,
-} from './ts/hdf-plan.js';
-
-// No amendments enum re-export — OverrideType already from hdf-results via export *.
-
-// Re-export evidence-package enums (runtime values)
-export {
-  ContentType,
-} from './ts/hdf-evidence-package.js';
+// Combined file has ALL enums and types from all 7 schemas — no per-file
+// re-exports needed. Mixing module paths causes TypeScript nominal type
+// incompatibility (structurally identical types from different .d.ts are not assignable).
+export * from '${primarySource}';
 
 // Re-export helper functions
 export * from './helpers.js';
