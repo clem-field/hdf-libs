@@ -23,11 +23,16 @@ import _ "embed"
 //go:embed results/inspec-multilayered.json
 var resultsInspecMultilayered []byte
 
+//go:embed results/minimal.json
+var resultsMinimal []byte
+
 // Results exposes embedded HDF Results documents.
 var Results = struct {
 	InspecMultilayered []byte
+	Minimal            []byte
 }{
 	InspecMultilayered: resultsInspecMultilayered,
+	Minimal:            resultsMinimal,
 }
 
 // ── HDF Baseline ─────────────────────────────────────────────────────────

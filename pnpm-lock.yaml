@@ -222,6 +222,9 @@ importers:
         specifier: ^3.0.1
         version: 3.0.1(ajv@8.18.0)
     devDependencies:
+      '@mitre/hdf-fixtures':
+        specifier: workspace:^
+        version: link:../hdf-fixtures
       '@stryker-mutator/core':
         specifier: ^9.5.1
         version: 9.5.1(@types/node@25.9.1)

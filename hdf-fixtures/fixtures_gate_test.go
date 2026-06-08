@@ -35,6 +35,7 @@ func TestEveryFixtureValidatesAgainstItsSchema(t *testing.T) {
 			schema: validators.TypeResults,
 			fixtures: map[string][]byte{
 				"inspec-multilayered.json": Results.InspecMultilayered,
+				"minimal.json":             Results.Minimal,
 			},
 		},
 		{

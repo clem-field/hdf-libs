@@ -1,15 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { results } from '@mitre/hdf-fixtures';
 import { parseResults, parse } from './index.js';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
 
 describe('Integration Tests - Real HDF Files', () => {
   it('should parse minimal HDF results fixture', () => {
-    const fixturePath = join(__dirname, '../../hdf-converters/converters/hdf-to-xml/fixtures/input/minimal.json');
-    const hdfJson = readFileSync(fixturePath, 'utf-8');
+    const hdfJson = results.minimal.read();
 
     const result = parseResults(hdfJson);
 
@@ -23,8 +18,7 @@ describe('Integration Tests - Real HDF Files', () => {
   });
 
   it('should auto-detect HDF results type', () => {
-    const fixturePath = join(__dirname, '../../hdf-converters/converters/hdf-to-xml/fixtures/input/minimal.json');
-    const hdfJson = readFileSync(fixturePath, 'utf-8');
+    const hdfJson = results.minimal.read();
 
     const result = parse(hdfJson);
 

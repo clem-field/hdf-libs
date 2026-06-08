@@ -7,6 +7,7 @@ import (
 	"testing"
 
 	"github.com/mitre/hdf-libs/hdf-converters/v3/registry"
+	fixtures "github.com/mitre/hdf-libs/hdf-fixtures"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -19,6 +20,12 @@ func fixtureRoot() string {
 
 func readFixture(t *testing.T, converter, filename string) []byte {
 	t.Helper()
+	// The hdf-to-xml minimal.json moved to the shared @mitre/hdf-fixtures
+	// package (per bead hdf-libs-e95o boundary rule) since multiple workspace
+	// packages consume it. Other converter fixtures stay where they are.
+	if converter == "hdf-to-xml" && filename == "minimal.json" {
+		return fixtures.Results.Minimal
+	}
 	path := filepath.Join(fixtureRoot(), converter, "fixtures", "input", filename)
 	data, err := os.ReadFile(path)
 	require.NoError(t, err, "fixture must exist: %s", path)

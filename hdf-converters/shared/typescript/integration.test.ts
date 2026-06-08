@@ -8,6 +8,7 @@
 import { describe, it, expect, beforeAll } from 'vitest';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
+import { results } from '@mitre/hdf-fixtures';
 import { detectConverter, detectConverterAll } from './fingerprint.js';
 import { registerAllFingerprints } from './register-all.js';
 import { _resetRegistry, getFingerprints } from './registry.js';
@@ -237,7 +238,7 @@ describe('integration: detectConverter with real fixtures', () => {
   });
 
   it('detects native HDF (passthrough)', () => {
-    const result = detectConverter(fixture('hdf-to-xml', 'minimal.json'));
+    const result = detectConverter(results.minimal.read());
     expect(result).toBeDefined();
     expect(result!.fingerprint.id).toBe('hdf-passthrough');
   });

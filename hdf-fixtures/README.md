@@ -52,6 +52,7 @@ CLAUDE.md's fixture-integrity rule).
 | File | Source | Consumers |
 |------|--------|-----------|
 | `inspec-multilayered.json` | InSpec runner, multi-overlay scan | hdf-extension-graph TS + Go tests + hdf-parsers parser parity test. The bug-exhibiting fixture for `hdf-libs-2nm0` — bare timestamps that broke parsers before #83/#828d landed. Moved from `hdf-extension-graph/test/fixtures/multilayered-inspec.json`. |
+| `minimal.json` | Hand-crafted minimal valid HDF Results doc | hdf-to-xml converter (TS + Go) + hdf-parsers integration test + hdf-validators integration test. The smallest schema-valid HDF Results document — single baseline, one passing requirement. Moved from `hdf-converters/converters/hdf-to-xml/fixtures/input/minimal.json`. |
 
 ### `baseline/` — HDF Baseline docs
 

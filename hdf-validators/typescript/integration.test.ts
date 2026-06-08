@@ -1,16 +1,10 @@
 import { describe, it, expect } from 'vitest';
-import { readFileSync } from 'fs';
-import { join, dirname } from 'path';
-import { fileURLToPath } from 'url';
+import { results } from '@mitre/hdf-fixtures';
 import { validateResults } from './index.js';
-
-const __dirname = dirname(fileURLToPath(import.meta.url));
 
 describe('Integration Tests - Real HDF Files', () => {
   it('should validate minimal HDF results fixture', () => {
-    const fixturePath = join(__dirname, '../../hdf-converters/converters/hdf-to-xml/fixtures/input/minimal.json');
-    const hdfJson = readFileSync(fixturePath, 'utf-8');
-    const hdfData = JSON.parse(hdfJson);
+    const hdfData = JSON.parse(results.minimal.read());
 
     const result = validateResults(hdfData);
 

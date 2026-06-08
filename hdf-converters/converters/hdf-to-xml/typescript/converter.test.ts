@@ -2,6 +2,7 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { results } from '@mitre/hdf-fixtures';
 import { convertHdfToXml } from './converter.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
@@ -14,7 +15,7 @@ function loadFixture(type: 'input' | 'expected', filename: string): string {
 describe('hdf-to-xml Converter', () => {
   describe('Basic conversion', () => {
     it('should convert minimal HDF to XML', () => {
-      const input = loadFixture('input', 'minimal.json');
+      const input = results.minimal.read();
       const expected = loadFixture('expected', 'minimal.xml');
 
       const result = convertHdfToXml(input);

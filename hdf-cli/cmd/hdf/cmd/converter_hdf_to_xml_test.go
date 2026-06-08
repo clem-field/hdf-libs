@@ -1,10 +1,10 @@
 package cmd
 
 import (
-	"os"
 	"strings"
 	"testing"
 
+	fixtures "github.com/mitre/hdf-libs/hdf-fixtures"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -17,8 +17,8 @@ func TestHDFToXMLConverter_IsRegistered(t *testing.T) {
 }
 
 func TestHDFToXMLConverter_Convert_Minimal(t *testing.T) {
-	inputData, err := os.ReadFile(converterFixturePath(t, "hdf-to-xml", "input/minimal.json"))
-	require.NoError(t, err, "Failed to read minimal.json fixture")
+	inputData := fixtures.Results.Minimal
+	require.NotEmpty(t, inputData, "Embedded fixtures.Results.Minimal should not be empty")
 
 	converter, err := GetConverter("hdf", "xml")
 	require.NoError(t, err, "Failed to get HDF-to-XML converter")

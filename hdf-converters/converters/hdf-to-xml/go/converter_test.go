@@ -7,14 +7,14 @@ import (
 	"strings"
 	"testing"
 
+	fixtures "github.com/mitre/hdf-libs/hdf-fixtures"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
 
 func TestConvertHDFToXML(t *testing.T) {
 	t.Run("should convert minimal HDF to XML", func(t *testing.T) {
-		input, err := os.ReadFile(filepath.Join("..", "fixtures", "input", "minimal.json"))
-		require.NoError(t, err)
+		input := fixtures.Results.Minimal
 
 		expected, err := os.ReadFile(filepath.Join("..", "fixtures", "expected", "minimal.xml"))
 		require.NoError(t, err)

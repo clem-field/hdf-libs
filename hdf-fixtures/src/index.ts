@@ -40,6 +40,7 @@ function fixture(category: string, name: string): FixtureRef {
 // HDF Results documents.
 export const results = {
   inspecMultilayered: fixture('results', 'inspec-multilayered.json'),
+  minimal: fixture('results', 'minimal.json'),
 } as const;
 
 // HDF Baseline documents.
