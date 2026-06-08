@@ -11,7 +11,9 @@ import { registerFingerprint, getFingerprint, type ConverterFingerprint } from '
 import { awsConfigFingerprint } from '../../converters/aws-config-to-hdf/typescript/fingerprint.js';
 import { checkovFingerprint } from '../../converters/checkov-to-hdf/typescript/fingerprint.js';
 import { conveyorFingerprint } from '../../converters/conveyor-to-hdf/typescript/fingerprint.js';
+import { csafVexFingerprint } from '../../converters/csaf-vex-to-hdf/typescript/fingerprint.js';
 import { cyclonedxFingerprint } from '../../converters/cyclonedx-to-hdf/typescript/fingerprint.js';
+import { cyclonedxVexFingerprint } from '../../converters/cyclonedx-vex-to-hdf/typescript/fingerprint.js';
 import { deptrackFingerprint } from '../../converters/deptrack-to-hdf/typescript/fingerprint.js';
 import { gitlabFingerprint } from '../../converters/gitlab-to-hdf/typescript/fingerprint.js';
 import { gosecFingerprint } from '../../converters/gosec-to-hdf/typescript/fingerprint.js';
@@ -22,6 +24,7 @@ import { msftDefenderDevopsFingerprint } from '../../converters/msft-defender-de
 import { msftDefenderEndpointFingerprint } from '../../converters/msft-defender-endpoint-to-hdf/typescript/fingerprint.js';
 import { msftSecureScoreFingerprint } from '../../converters/msft-secure-score-to-hdf/typescript/fingerprint.js';
 import { neuvectorFingerprint } from '../../converters/neuvector-to-hdf/typescript/fingerprint.js';
+import { openvexFingerprint } from '../../converters/openvex-to-hdf/typescript/fingerprint.js';
 import { sarifFingerprint } from '../../converters/sarif-to-hdf/typescript/fingerprint.js';
 import { scoutsuiteFingerprint } from '../../converters/scoutsuite-to-hdf/typescript/fingerprint.js';
 import { snykFingerprint } from '../../converters/snyk-to-hdf/typescript/fingerprint.js';
@@ -68,7 +71,9 @@ const allFingerprints: ConverterFingerprint[] = [
   cklbFingerprint,
   checkovFingerprint,
   conveyorFingerprint,
+  csafVexFingerprint,
   cyclonedxFingerprint,
+  cyclonedxVexFingerprint,
   deptrackFingerprint,
   gitlabFingerprint,
   gosecFingerprint,
@@ -79,6 +84,7 @@ const allFingerprints: ConverterFingerprint[] = [
   msftDefenderEndpointFingerprint,
   msftSecureScoreFingerprint,
   neuvectorFingerprint,
+  openvexFingerprint,
   sarifFingerprint,
   scoutsuiteFingerprint,
   snykFingerprint,

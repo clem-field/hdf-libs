@@ -18,6 +18,24 @@
       "description": "The type of amendment, aligned with FedRAMP deviation request categories. 'waiver': risk accepted by Authorizing Official. 'attestation': manually verified by assessor. 'poam': remediation tracked (no status change). 'inherited': control provided by another component or system. 'falsePositive': scanner incorrectly identified a finding — for compliance scans (STIG, CIS), the check actually passes, so status is typically set to 'passed'; for vulnerability scans (CVE, SCA), the flagged vulnerability does not apply to this system, so status is typically set to 'notApplicable'. The disposition field on the requirement distinguishes false positives from genuinely not-applicable findings. 'riskAdjustment': impact score adjusted based on environmental context (FedRAMP Risk Adjustment); does not change pass/fail status, only impact via the impact field. 'operationalRequirement': deviation required by operational constraints (FedRAMP Operational Requirement); the finding cannot be remediated because the system requires the affected functionality. Remains an open risk. Migration note: 'exception' was removed in v3.1.0 — use 'waiver' with status 'notApplicable' instead.",
       "title": "Override Type"
     },
+    "Justification": {
+      "type": "string",
+      "enum": [
+        "component_not_present",
+        "vulnerable_code_not_present",
+        "vulnerable_code_not_in_execute_path",
+        "vulnerable_code_cannot_be_controlled_by_adversary",
+        "inline_mitigations_already_exist",
+        "requires_configuration",
+        "requires_dependency",
+        "requires_environment",
+        "protected_by_compiler",
+        "protected_at_runtime",
+        "protected_at_perimeter"
+      ],
+      "description": "Structured controlled-vocabulary reason for an override, complementing the free-text 'reason' field. 'reason' carries the human-readable rationale an auditor reads; 'justification' carries the machine-readable category enabling filtering, aggregation, and lossless round-trip with structured ecosystems (VEX, OSCAL, FedRAMP DR). Both fields may be present simultaneously and are NOT redundant: 'reason' explains the specific circumstance; 'justification' classifies it. Authors SHOULD populate both when a controlled-vocabulary value applies — the enum value alone is not self-explanatory to an auditor. The vocabulary is drawn from the VEX ecosystem: the first five values are common across OpenVEX, CSAF VEX, and CycloneDX VEX; the remaining six (requires_configuration / requires_dependency / requires_environment / protected_by_compiler / protected_at_runtime / protected_at_perimeter) are CycloneDX-specific and describe why the vulnerable code path is unreachable in the deployed configuration. The enum is extended additively across schema versions as other ecosystems' controlled vocabularies are integrated; documents using values added in a newer schema version will fail validation against an older schema. Consumers SHOULD validate against the schema version declared by the document ($schema) rather than assume a fixed vocabulary.",
+      "title": "Justification"
+    },
     "Impact_Override": {
       "type": "object",
       "required": ["value"],
@@ -107,6 +125,10 @@
           "$comment": "When present alongside impact.value on a riskAdjustment override, impact.value should be approximately cvss.computedScore / 10.0. Soft consistency rule — validators may warn but should not error. The cvss block makes Environmental/Threat enrichment auditable.",
           "description": "Structured CVSS scoring data backing this override. Captures the rubric (which Environmental/Threat metrics the consumer modified, the recomputed score) used to justify a riskAdjustment. For other override types this is optional context."
         },
+        "justification": {
+          "$ref": "#/$defs/Justification",
+          "description": "Structured controlled-vocabulary classification for why this override applies. Complements (does not replace) the free-text 'reason' field. Most useful on falsePositive and attestation overrides where the structured category enables filtering and lossless round-trip with VEX / OSCAL / FedRAMP DR. See the Justification primitive for the precedent vocabulary and rationale."
+        },
         "milestones": {
           "type": "array",
           "items": {
@@ -123,6 +145,13 @@
           "type": "string",
           "format": "uuid",
           "description": "componentId of the component this amendment is scoped to. When set, the amendment only applies to the specified component. When omitted, the amendment applies system-wide."
+        },
+        "affectedPackages": {
+          "type": "array",
+          "items": {
+            "$ref": "https://mitre.github.io/hdf-libs/schemas/primitives/affected-package/v3.2.0#/$defs/Affected_Package"
+          },
+          "description": "Software packages this amendment is scoped to, distinct from componentRef (which scopes to an HDF-internal Component by UUID). Use when the source amendment format references packages by purl/cpe/name+version — e.g., VEX `affects[]` / `products[]`, OSCAL POA&M `subjects[]`, FedRAMP component-aware amendments. Symmetric with Evaluated_Requirement.affectedPackages, which scopes findings to the same package vocabulary. When omitted, the amendment applies system-wide (or only to componentRef when that is set)."
         }
       },
       "examples": [
@@ -204,6 +233,21 @@
           "appliedBy": { "type": "email", "identifier": "issm@agency.gov" },
           "appliedAt": "2026-03-26T10:00:00Z",
           "expiresAt": "2026-09-26T00:00:00Z"
+        },
+        {
+          "$comment": "VEX-style import — falsePositive scoped to specific packages by purl. The affectedPackages array carries structured product identity instead of squeezing 'Products: …' into the reason free-text field.",
+          "type": "falsePositive",
+          "requirementId": "CVE-2026-12345",
+          "status": "notApplicable",
+          "reason": "Vulnerable code path is not present in our build — dependency compiled with the affected module disabled",
+          "justification": "vulnerable_code_not_present",
+          "appliedBy": { "type": "email", "identifier": "secops@org.gov" },
+          "appliedAt": "2026-05-01T10:00:00Z",
+          "expiresAt": "2027-05-01T00:00:00Z",
+          "affectedPackages": [
+            { "purl": "pkg:npm/lodash@4.17.20" },
+            { "purl": "pkg:rpm/openssl@1.1.1k-2.el8", "fixedInVersion": "1.1.1k-3.el8" }
+          ]
         }
       ],
       "title": "Standalone Override"

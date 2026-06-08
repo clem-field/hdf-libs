@@ -384,7 +384,9 @@ These flags apply to all commands.
 | `ckl` | | DISA STIG Viewer checklist (`.ckl` XML) |
 | `cklb` | | DISA STIG Viewer 3.x checklist (`.cklb` JSON) |
 | `conveyor` | | Conveyor container security (JSON) |
-| `cyclonedx` | | CycloneDX SBOM/VEX (JSON) |
+| `csaf-vex` | | CSAF VEX advisory (csaf_vex profile) → HDF Amendments (JSON) |
+| `cyclonedx` | | CycloneDX SBOM (JSON) — VEX-bearing BOMs auto-route to cyclonedx-vex |
+| `cyclonedx-vex` | | CycloneDX BOM with VEX analysis statements → HDF Amendments (JSON) |
 | `dbprotect` | | DbProtect database scanner (XML) |
 | `deptrack` | `dependency-track` | Dependency-Track vulnerability audit (JSON) |
 | `fortify` | | Micro Focus Fortify SAST (FVDL XML) |
@@ -403,6 +405,7 @@ These flags apply to all commands.
 | `netsparker` | `invicti` | Netsparker/Invicti web scanner (XML) |
 | `neuvector` | | NeuVector container security (JSON) |
 | `nikto` | | Nikto web server scanner (JSON) |
+| `openvex` | | OpenVEX statements → HDF Amendments (JSON) |
 | `oscal` | | OSCAL document (auto-detect type) |
 | `oscal-sar` | `oscal-assessment-results` | OSCAL Assessment Results → HDF Results |
 | `oscal-catalog` | | OSCAL Catalog → HDF Baseline |
@@ -434,6 +437,9 @@ Auto-detection: `hdf convert <file>` identifies the input format automatically. 
 | `hdf` | `cklb` | Export to DISA STIG Viewer 3.x checklist (`.cklb` JSON) |
 | `hdf` | `oscal-sar` | Export to OSCAL Assessment Results |
 | `hdf` | `oscal-poam` | Export to OSCAL Plan of Action and Milestones |
+| `hdf-amendments` | `csaf-vex` | Export HDF Amendments as CSAF VEX advisory (partial-fidelity round-trip) |
+| `hdf-amendments` | `openvex` | Export HDF Amendments as OpenVEX statements (partial-fidelity round-trip) |
+| `hdf-amendments` | `cyclonedx-vex` | Export HDF Amendments as CycloneDX BOM with VEX analysis (partial-fidelity round-trip) |
 
 ## Credential Handling
 

@@ -136,6 +136,24 @@ export { convertHdfToOscalPoam } from '../converters/hdf-to-oscal-poam/typescrip
 // Ion Channel to HDF converter
 export { convertIonchannelToHdf } from '../converters/ionchannel-to-hdf/typescript/index.js';
 
+// OpenVEX to HDF Amendments converter
+export { convertOpenVexToHdf } from '../converters/openvex-to-hdf/typescript/index.js';
+
+// CSAF VEX to HDF Amendments converter
+export { convertCsafVexToHdf } from '../converters/csaf-vex-to-hdf/typescript/index.js';
+
+// CycloneDX VEX to HDF Amendments converter
+export { convertCyclonedxVexToHdf } from '../converters/cyclonedx-vex-to-hdf/typescript/index.js';
+
+// HDF Amendments to CSAF VEX converter (export side; partial-fidelity by design)
+export { convertHdfToCsafVex } from '../converters/hdf-to-csaf-vex/typescript/index.js';
+
+// HDF Amendments to OpenVEX converter (export side; partial-fidelity by design)
+export { convertHdfToOpenVex } from '../converters/hdf-to-openvex/typescript/index.js';
+
+// HDF Amendments to CycloneDX VEX converter (export side; partial-fidelity by design)
+export { convertHdfToCyclonedxVex } from '../converters/hdf-to-cyclonedx-vex/typescript/index.js';
+
 // OSCAL to HDF converters
 export { convertOscalCatalogToHdf } from '../converters/oscal-to-hdf/typescript/index.js';
 export { convertOscalProfileToHdf } from '../converters/oscal-to-hdf/typescript/index.js';

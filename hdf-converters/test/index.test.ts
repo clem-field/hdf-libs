@@ -29,6 +29,12 @@ import {
   convertDeptrackToHdf,
   convertJfrogXrayToHdf,
   convertNeuvectorToHdf,
+  convertOpenVexToHdf,
+  convertCsafVexToHdf,
+  convertCyclonedxVexToHdf,
+  convertHdfToCsafVex,
+  convertHdfToCyclonedxVex,
+  convertHdfToOpenVex,
   convertFortifyToHdf,
   convertPrismaToHdf,
   convertNetsparkerToHdf,
@@ -255,6 +261,36 @@ describe('Main exports', () => {
   it('should export convertFortifyToHdf from main index', () => {
     expect(convertFortifyToHdf).toBeDefined();
     expect(typeof convertFortifyToHdf).toBe('function');
+  });
+
+  it('should export convertOpenVexToHdf from main index', () => {
+    expect(convertOpenVexToHdf).toBeDefined();
+    expect(typeof convertOpenVexToHdf).toBe('function');
+  });
+
+  it('should export convertCsafVexToHdf from main index', () => {
+    expect(convertCsafVexToHdf).toBeDefined();
+    expect(typeof convertCsafVexToHdf).toBe('function');
+  });
+
+  it('should export convertCyclonedxVexToHdf from main index', () => {
+    expect(convertCyclonedxVexToHdf).toBeDefined();
+    expect(typeof convertCyclonedxVexToHdf).toBe('function');
+  });
+
+  it('should export convertHdfToCsafVex from main index', () => {
+    expect(convertHdfToCsafVex).toBeDefined();
+    expect(typeof convertHdfToCsafVex).toBe('function');
+  });
+
+  it('should export convertHdfToOpenVex from main index', () => {
+    expect(convertHdfToOpenVex).toBeDefined();
+    expect(typeof convertHdfToOpenVex).toBe('function');
+  });
+
+  it('should export convertHdfToCyclonedxVex from main index', () => {
+    expect(convertHdfToCyclonedxVex).toBeDefined();
+    expect(typeof convertHdfToCyclonedxVex).toBe('function');
   });
 
   it('should export convertNeuvectorToHdf from main index', () => {

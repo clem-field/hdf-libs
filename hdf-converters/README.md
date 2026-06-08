@@ -17,7 +17,9 @@ All converter output conforms to the [HDF JSON Schema](https://mitre.github.io/h
 | CKL (DISA STIG Viewer checklist) | `convertCklToHdf` | XML |
 | CKLB (DISA STIG Viewer 3.x checklist) | `convertCklbToHdf` | JSON |
 | Conveyor | `convertConveyorToHdf` | JSON |
-| CycloneDX (SBOM/VEX) | `convertCyclonedxToHdf` | JSON |
+| CSAF VEX (→ HDF Amendments) | `convertCsafVexToHdf` | JSON |
+| CycloneDX (SBOM) | `convertCyclonedxToHdf` | JSON |
+| CycloneDX VEX (→ HDF Amendments) | `convertCyclonedxVexToHdf` | JSON |
 | DBProtect | `convertDbprotectToHdf` | XML |
 | Dependency-Track | `convertDeptrackToHdf` | JSON |
 | Fortify | `convertFortifyToHdf` | XML |
@@ -35,6 +37,7 @@ All converter output conforms to the [HDF JSON Schema](https://mitre.github.io/h
 | Netsparker / Invicti | `convertNetsparkerToHdf` | XML |
 | NeuVector | `convertNeuvectorToHdf` | JSON |
 | Nikto | `convertNiktoToHdf` | JSON |
+| OpenVEX (→ HDF Amendments) | `convertOpenVexToHdf` | JSON |
 | OSCAL Catalog | `convertOscalCatalogToHdf` | JSON |
 | OSCAL Component Definition | `convertOscalComponentToHdf` | JSON |
 | OSCAL POA&M | `convertOscalPoamToHdf` | JSON |
@@ -65,6 +68,9 @@ All converter output conforms to the [HDF JSON Schema](https://mitre.github.io/h
 | CKLB (DISA STIG Viewer 3.x checklist) | `convertHdfToCklb` |
 | OSCAL SAR | `convertHdfToOscalSar` |
 | OSCAL POA&M | `convertHdfToOscalPoam` |
+| CSAF VEX (HDF Amendments → advisory, partial-fidelity) | `convertHdfToCsafVex` |
+| OpenVEX (HDF Amendments → statements, partial-fidelity) | `convertHdfToOpenVex` |
+| CycloneDX VEX (HDF Amendments → BOM, partial-fidelity) | `convertHdfToCyclonedxVex` |
 
 ### Format Migration
 
