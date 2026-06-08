@@ -136,6 +136,8 @@ jobs:
       - uses: actions/checkout@df4cb1c069e1874edd31b4311f1884172cec0e10 # v6.0.3
 
       - uses: ./.github/actions/setup
+        with:
+          node-version: ${{ env.NODE_VERSION }}
 
       - name: Build schemas
         run: cd hdf-schema && pnpm build:schemas
