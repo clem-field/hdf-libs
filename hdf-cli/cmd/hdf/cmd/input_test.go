@@ -3,6 +3,7 @@ package cmd
 import (
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -54,6 +55,57 @@ func TestReadFromFile_ValidFile(t *testing.T) {
 	}
 	if string(data) != string(content) {
 		t.Errorf("content mismatch: got %q, want %q", data, content)
+	}
+}
+
+func TestReadInputFile_StripsBOM(t *testing.T) {
+	tmpDir := t.TempDir()
+	tmpFile := filepath.Join(tmpDir, "bom.json")
+	content := []byte(`{"test": "data"}`)
+	withBOM := append([]byte{0xEF, 0xBB, 0xBF}, content...)
+	if err := os.WriteFile(tmpFile, withBOM, 0o600); err != nil {
+		t.Fatalf("failed to create temp file: %v", err)
+	}
+
+	data, err := readInputFile(tmpFile)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if string(data) != string(content) {
+		t.Errorf("BOM not stripped: got %q, want %q", data, content)
+	}
+}
+
+func TestReadInputFile_NoBOMUnchanged(t *testing.T) {
+	tmpDir := t.TempDir()
+	tmpFile := filepath.Join(tmpDir, "plain.json")
+	content := []byte(`{"test": "data"}`)
+	if err := os.WriteFile(tmpFile, content, 0o600); err != nil {
+		t.Fatalf("failed to create temp file: %v", err)
+	}
+
+	data, err := readInputFile(tmpFile)
+	if err != nil {
+		t.Fatalf("unexpected error: %v", err)
+	}
+	if string(data) != string(content) {
+		t.Errorf("content altered: got %q, want %q", data, content)
+	}
+}
+
+func TestReadInputFile_BOMOnly(t *testing.T) {
+	tmpDir := t.TempDir()
+	tmpFile := filepath.Join(tmpDir, "bomonly.json")
+	if err := os.WriteFile(tmpFile, []byte{0xEF, 0xBB, 0xBF}, 0o600); err != nil {
+		t.Fatalf("failed to create temp file: %v", err)
+	}
+
+	_, err := readInputFile(tmpFile)
+	if err == nil {
+		t.Fatal("expected error for a file containing only a BOM")
+	}
+	if !strings.Contains(err.Error(), "no input provided") {
+		t.Errorf("unexpected error message: %v", err)
 	}
 }
 
