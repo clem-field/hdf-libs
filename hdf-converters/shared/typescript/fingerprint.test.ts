@@ -224,6 +224,32 @@ describe('detectConverterAll', () => {
   });
 });
 
+describe('NDJSON detection', () => {
+  beforeEach(() => _resetRegistry());
+
+  it('detects NDJSON (one object per line)', () => {
+    registerFingerprint(gosecFP);
+    const ndjson = `${GOSEC_INPUT}\n${GOSEC_INPUT}\n`;
+    const result = detectConverter(ndjson);
+    expect(result).toBeDefined();
+    expect(result!.fingerprint.id).toBe('gosec-to-hdf');
+    expect(result!.confidence).toBe(1.0);
+  });
+
+  it('skips leading blank lines', () => {
+    registerFingerprint(gosecFP);
+    const ndjson = `\n  \n${GOSEC_INPUT}\n${GOSEC_INPUT}`;
+    const result = detectConverter(ndjson);
+    expect(result).toBeDefined();
+    expect(result!.fingerprint.id).toBe('gosec-to-hdf');
+  });
+
+  it('returns no matches when the first line is malformed', () => {
+    registerFingerprint(gosecFP);
+    expect(detectConverterAll('{broken\n{also broken')).toHaveLength(0);
+  });
+});
+
 describe('BOM-prefixed input', () => {
   beforeEach(() => _resetRegistry());
 
@@ -240,6 +266,13 @@ describe('BOM-prefixed input', () => {
     const result = detectConverter(`\uFEFF${JUNIT_INPUT}`);
     expect(result).toBeDefined();
     expect(result!.fingerprint.id).toBe('junit-to-hdf');
+  });
+
+  it('detects BOM-prefixed NDJSON', () => {
+    registerFingerprint(gosecFP);
+    const result = detectConverter(`\uFEFF${GOSEC_INPUT}\n${GOSEC_INPUT}`);
+    expect(result).toBeDefined();
+    expect(result!.fingerprint.id).toBe('gosec-to-hdf');
   });
 });
 

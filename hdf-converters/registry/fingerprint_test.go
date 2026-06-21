@@ -203,6 +203,14 @@ func TestDetectConverter_BOM(t *testing.T) {
 		require.NotNil(t, result)
 		assert.Equal(t, "junit-to-hdf", result.Fingerprint.ID)
 	})
+
+	t.Run("detects BOM-prefixed NDJSON", func(t *testing.T) {
+		ResetRegistry()
+		registerTestFingerprints()
+		result := DetectConverter(withBOM(gosecInput + "\n" + gosecInput))
+		require.NotNil(t, result)
+		assert.Equal(t, "gosec-to-hdf", result.Fingerprint.ID)
+	})
 }
 
 func TestDetectConverterAll(t *testing.T) {
@@ -244,6 +252,41 @@ func TestDetectConverterAll(t *testing.T) {
 		assert.Equal(t, 0.5, results[0].Confidence)
 		assert.Equal(t, "gitlab-to-hdf", results[1].Fingerprint.ID)
 		assert.Equal(t, 0.4, results[1].Confidence)
+	})
+}
+
+func TestDetectConverterAll_NDJSON(t *testing.T) {
+	t.Run("detects NDJSON (one object per line)", func(t *testing.T) {
+		ResetRegistry()
+		registerTestFingerprints()
+		ndjson := []byte(gosecInput + "\n" + gosecInput + "\n")
+		results := DetectConverterAll(ndjson)
+		require.Len(t, results, 1)
+		assert.Equal(t, "gosec-to-hdf", results[0].Fingerprint.ID)
+		assert.Equal(t, 1.0, results[0].Confidence)
+	})
+
+	t.Run("skips leading blank lines", func(t *testing.T) {
+		ResetRegistry()
+		registerTestFingerprints()
+		ndjson := []byte("\n  \n" + gosecInput + "\n" + gosecInput)
+		results := DetectConverterAll(ndjson)
+		require.Len(t, results, 1)
+		assert.Equal(t, "gosec-to-hdf", results[0].Fingerprint.ID)
+	})
+
+	t.Run("returns nil when the first line is malformed", func(t *testing.T) {
+		ResetRegistry()
+		registerTestFingerprints()
+		assert.Nil(t, DetectConverterAll([]byte("{broken\n{also broken")))
+	})
+
+	t.Run("single object with trailing newline still uses whole-input parse", func(t *testing.T) {
+		ResetRegistry()
+		registerTestFingerprints()
+		results := DetectConverterAll([]byte(gosecInput + "\n"))
+		require.Len(t, results, 1)
+		assert.Equal(t, "gosec-to-hdf", results[0].Fingerprint.ID)
 	})
 }
 
