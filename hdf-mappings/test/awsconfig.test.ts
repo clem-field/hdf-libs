@@ -8,14 +8,17 @@ import {
   getAllAwsConfigRuleNames,
   awsConfigIdentifierExists,
   awsConfigRuleNameExists,
+  awsConfigMappedRevisions,
   getAllAwsConfigMappings,
 } from '../src/awsconfig/index.js';
 
 describe('AWS Config Mapping Functions', () => {
   describe('getAwsConfigNistMappingByIdentifier', () => {
     it('should return mapping for valid identifier', () => {
+      // Rev4-only rule; pin the lookup so it is unaffected by the default revision.
       const mapping = getAwsConfigNistMappingByIdentifier(
-        'SECRETSMANAGER_SCHEDULED_ROTATION_SUCCESS_CHECK'
+        'SECRETSMANAGER_SCHEDULED_ROTATION_SUCCESS_CHECK',
+        4
       );
       expect(mapping).toBeDefined();
       expect(mapping?.AwsConfigRuleSourceIdentifier).toBe(
@@ -36,7 +39,8 @@ describe('AWS Config Mapping Functions', () => {
   describe('getAwsConfigNistMappingByName', () => {
     it('should return mapping for valid rule name', () => {
       const mapping = getAwsConfigNistMappingByName(
-        'secretsmanager-scheduled-rotation-success-check'
+        'secretsmanager-scheduled-rotation-success-check',
+        4
       );
       expect(mapping).toBeDefined();
       expect(mapping?.AwsConfigRuleSourceIdentifier).toBe(
@@ -54,7 +58,8 @@ describe('AWS Config Mapping Functions', () => {
   describe('getAwsConfigNistControlByIdentifier', () => {
     it('should return NIST control for valid identifier', () => {
       const nistId = getAwsConfigNistControlByIdentifier(
-        'SECRETSMANAGER_SCHEDULED_ROTATION_SUCCESS_CHECK'
+        'SECRETSMANAGER_SCHEDULED_ROTATION_SUCCESS_CHECK',
+        4
       );
       expect(nistId).toBe('AC-2(1)|AC-2(j)');
     });
@@ -65,7 +70,7 @@ describe('AWS Config Mapping Functions', () => {
     });
 
     it('should handle complex NIST IDs', () => {
-      const nistId = getAwsConfigNistControlByIdentifier('IAM_PASSWORD_POLICY');
+      const nistId = getAwsConfigNistControlByIdentifier('IAM_PASSWORD_POLICY', 4);
       expect(nistId).toBe('AC-2(1)|AC-2(f)|AC-2(j)|IA-2|IA-5(1)(a)(d)(e)|IA-5(4)');
     });
   });
@@ -73,7 +78,8 @@ describe('AWS Config Mapping Functions', () => {
   describe('getAwsConfigNistControlByName', () => {
     it('should return NIST control for valid rule name', () => {
       const nistId = getAwsConfigNistControlByName(
-        'secretsmanager-scheduled-rotation-success-check'
+        'secretsmanager-scheduled-rotation-success-check',
+        4
       );
       expect(nistId).toBe('AC-2(1)|AC-2(j)');
     });
@@ -86,7 +92,7 @@ describe('AWS Config Mapping Functions', () => {
 
   describe('getAllAwsConfigIdentifiers', () => {
     it('should return all identifiers', () => {
-      const identifiers = getAllAwsConfigIdentifiers();
+      const identifiers = getAllAwsConfigIdentifiers(4);
       expect(Array.isArray(identifiers)).toBe(true);
       expect(identifiers.length).toBeGreaterThan(0);
       expect(identifiers).toContain('SECRETSMANAGER_SCHEDULED_ROTATION_SUCCESS_CHECK');
@@ -102,7 +108,7 @@ describe('AWS Config Mapping Functions', () => {
 
   describe('getAllAwsConfigRuleNames', () => {
     it('should return all rule names', () => {
-      const names = getAllAwsConfigRuleNames();
+      const names = getAllAwsConfigRuleNames(4);
       expect(Array.isArray(names)).toBe(true);
       expect(names.length).toBeGreaterThan(0);
       expect(names).toContain('secretsmanager-scheduled-rotation-success-check');
@@ -119,9 +125,9 @@ describe('AWS Config Mapping Functions', () => {
   describe('awsConfigIdentifierExists', () => {
     it('should return true for valid identifiers', () => {
       expect(
-        awsConfigIdentifierExists('SECRETSMANAGER_SCHEDULED_ROTATION_SUCCESS_CHECK')
+        awsConfigIdentifierExists('SECRETSMANAGER_SCHEDULED_ROTATION_SUCCESS_CHECK', 4)
       ).toBe(true);
-      expect(awsConfigIdentifierExists('IAM_USER_GROUP_MEMBERSHIP_CHECK')).toBe(true);
+      expect(awsConfigIdentifierExists('IAM_USER_GROUP_MEMBERSHIP_CHECK', 4)).toBe(true);
     });
 
     it('should return false for invalid identifier', () => {
@@ -131,10 +137,10 @@ describe('AWS Config Mapping Functions', () => {
 
   describe('awsConfigRuleNameExists', () => {
     it('should return true for valid rule names', () => {
-      expect(awsConfigRuleNameExists('secretsmanager-scheduled-rotation-success-check')).toBe(
+      expect(awsConfigRuleNameExists('secretsmanager-scheduled-rotation-success-check', 4)).toBe(
         true
       );
-      expect(awsConfigRuleNameExists('iam-user-group-membership-check')).toBe(true);
+      expect(awsConfigRuleNameExists('iam-user-group-membership-check', 4)).toBe(true);
     });
 
     it('should return false for invalid rule name', () => {
@@ -164,5 +170,45 @@ describe('AWS Config Mapping Functions', () => {
       expect(identifiers).toContain('SECRETSMANAGER_SCHEDULED_ROTATION_SUCCESS_CHECK');
       expect(identifiers).toContain('IAM_USER_GROUP_MEMBERSHIP_CHECK');
     });
+  });
+
+  describe('awsConfigMappedRevisions', () => {
+    it('returns both revisions for a rule mapped at each', () => {
+      expect(awsConfigMappedRevisions('CLOUD_TRAIL_ENABLED', 'cloudtrail-enabled')).toEqual([4, 5]);
+    });
+
+    it('returns only Rev 5 for a Rev5-only rule', () => {
+      expect(awsConfigMappedRevisions('API_GW_SSL_ENABLED', 'api-gw-ssl-enabled')).toEqual([5]);
+    });
+
+    it('returns only Rev 4 for a Rev4-only rule', () => {
+      expect(
+        awsConfigMappedRevisions(
+          'SECRETSMANAGER_SCHEDULED_ROTATION_SUCCESS_CHECK',
+          'secretsmanager-scheduled-rotation-success-check'
+        )
+      ).toEqual([4]);
+    });
+
+    it('returns empty for an unmapped rule', () => {
+      expect(awsConfigMappedRevisions('NOPE', 'no-such-rule')).toEqual([]);
+    });
+  });
+});
+
+describe('revision-aware lookup', () => {
+  it('returns Rev 5 by default and Rev 4 when requested', () => {
+    expect(getAwsConfigNistControlByName('access-keys-rotated')).toBe('AC-3(15)');
+    expect(getAwsConfigNistControlByName('access-keys-rotated', 4)).toBe('AC-2(1)|AC-2(j)');
+    expect(getAwsConfigNistControlByName('access-keys-rotated', 5)).toBe('AC-3(15)');
+  });
+
+  it('identifier lookup is revision-aware', () => {
+    expect(getAwsConfigNistMappingByIdentifier('ACCESS_KEYS_ROTATED')?.Rev).toBe(5);
+    expect(getAwsConfigNistMappingByIdentifier('ACCESS_KEYS_ROTATED', 4)?.Rev).toBe(4);
+  });
+
+  it('returns undefined for an unknown revision', () => {
+    expect(getAwsConfigNistControlByName('access-keys-rotated', 99)).toBeUndefined();
   });
 });

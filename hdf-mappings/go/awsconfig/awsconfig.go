@@ -6,6 +6,8 @@ import (
 	"encoding/json"
 	"strings"
 	"sync"
+
+	"github.com/mitre/hdf-libs/hdf-mappings/go/v3/nist"
 )
 
 // Mapping represents a single AWS Config rule to NIST control mapping.
@@ -20,45 +22,83 @@ type Mapping struct {
 var mappingsData []byte
 
 var (
-	byRuleName   map[string]*Mapping
-	byIdentifier map[string]*Mapping
+	// keyed by revision → name/identifier → mapping
+	byRuleName   map[int]map[string]*Mapping
+	byIdentifier map[int]map[string]*Mapping
 	loadOnce     sync.Once
 )
 
 func load() {
 	loadOnce.Do(func() {
+		byRuleName = make(map[int]map[string]*Mapping)
+		byIdentifier = make(map[int]map[string]*Mapping)
 		var list []Mapping
 		if err := json.Unmarshal(mappingsData, &list); err != nil {
-			byRuleName = make(map[string]*Mapping)
-			byIdentifier = make(map[string]*Mapping)
 			return
 		}
-		byRuleName = make(map[string]*Mapping, len(list))
-		byIdentifier = make(map[string]*Mapping, len(list))
 		for i := range list {
 			m := &list[i]
-			byRuleName[m.AwsConfigRuleName] = m
-			byIdentifier[m.AwsConfigRuleSourceIdentifier] = m
+			if byRuleName[m.Rev] == nil {
+				byRuleName[m.Rev] = make(map[string]*Mapping)
+				byIdentifier[m.Rev] = make(map[string]*Mapping)
+			}
+			byRuleName[m.Rev][m.AwsConfigRuleName] = m
+			byIdentifier[m.Rev][m.AwsConfigRuleSourceIdentifier] = m
 		}
 	})
 }
 
-// GetByRuleName returns the mapping for the given kebab-case rule name, or nil if not found.
+// GetByRuleName returns the mapping for the given kebab-case rule name at the
+// default NIST revision, or nil if not found.
 func GetByRuleName(name string) *Mapping {
-	load()
-	return byRuleName[name]
+	return GetByRuleNameForRevision(name, nist.Revision())
 }
 
-// GetByIdentifier returns the mapping for the given UPPERCASE source identifier, or nil if not found.
+// GetByRuleNameForRevision returns the mapping for the given rule name at the
+// requested NIST revision, or nil if not found.
+func GetByRuleNameForRevision(name string, rev int) *Mapping {
+	load()
+	return byRuleName[rev][name]
+}
+
+// GetByIdentifier returns the mapping for the given UPPERCASE source identifier
+// at the default NIST revision, or nil if not found.
 func GetByIdentifier(id string) *Mapping {
-	load()
-	return byIdentifier[id]
+	return GetByIdentifierForRevision(id, nist.Revision())
 }
 
-// NISTControls returns the pipe-separated NIST-ID string split into individual control IDs
-// for the given rule name. Returns nil if the rule is not in the mapping.
+// GetByIdentifierForRevision returns the mapping for the given source identifier
+// at the requested NIST revision, or nil if not found.
+func GetByIdentifierForRevision(id string, rev int) *Mapping {
+	load()
+	return byIdentifier[rev][id]
+}
+
+// NISTControls returns the NIST control IDs for the given rule name at the
+// default NIST revision. Returns nil if the rule is not in the mapping.
 func NISTControls(ruleName string) []string {
-	m := GetByRuleName(ruleName)
+	return NISTControlsForRevision(ruleName, nist.Revision())
+}
+
+// NISTControlsForRevision returns the NIST control IDs for the given rule name
+// at the requested NIST revision. Returns nil if the rule is not mapped.
+func NISTControlsForRevision(ruleName string, rev int) []string {
+	return controlsFromMapping(GetByRuleNameForRevision(ruleName, rev))
+}
+
+// NISTControlsByIdentifier returns the NIST control IDs for the given source
+// identifier at the default NIST revision. Returns nil if not mapped.
+func NISTControlsByIdentifier(identifier string) []string {
+	return NISTControlsByIdentifierForRevision(identifier, nist.Revision())
+}
+
+// NISTControlsByIdentifierForRevision returns the NIST control IDs for the given
+// source identifier at the requested NIST revision. Returns nil if not mapped.
+func NISTControlsByIdentifierForRevision(identifier string, rev int) []string {
+	return controlsFromMapping(GetByIdentifierForRevision(identifier, rev))
+}
+
+func controlsFromMapping(m *Mapping) []string {
 	if m == nil || m.NISTID == "" {
 		return nil
 	}
@@ -70,4 +110,29 @@ func NISTControls(ruleName string) []string {
 		}
 	}
 	return controls
+}
+
+// MappedRevisions returns the supported NIST revisions at which the rule
+// resolves to a non-empty control list, sorted ascending. It mirrors the
+// resolution buildNISTTags performs (source identifier first, then rule name),
+// so a revision is included exactly when a conversion at that revision would
+// emit NIST tags for the rule. An empty result means the rule is unmapped at
+// every revision (not a revision mismatch).
+func MappedRevisions(sourceIdentifier, ruleName string) []int {
+	load()
+	var revs []int
+	for _, rev := range nist.SupportedRevisions() {
+		if mappedInIndex(byIdentifier[rev], sourceIdentifier) || mappedInIndex(byRuleName[rev], ruleName) {
+			revs = append(revs, rev)
+		}
+	}
+	return revs
+}
+
+func mappedInIndex(index map[string]*Mapping, key string) bool {
+	if key == "" {
+		return false
+	}
+	m := index[key]
+	return m != nil && m.NISTID != ""
 }
