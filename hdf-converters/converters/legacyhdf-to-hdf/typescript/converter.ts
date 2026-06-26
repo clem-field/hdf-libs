@@ -11,6 +11,7 @@
 
 import { flattenOverlays } from '@mitre/hdf-parsers';
 import type { HDFResults } from '@mitre/hdf-schema';
+import { impactToSeverity } from '@mitre/hdf-utilities';
 import { deriveControlTypeFromTags, validateInputSize } from '../../../shared/typescript/converterutil.js';
 
 // ===== V1.0 Type Definitions =====
@@ -121,10 +122,8 @@ export interface V2Result {
   message?: string;
   exception?: string;
   backtrace?: unknown;
-  resourceClass?: string;
-  resourceParams?: string;
+  resource?: string;
   resourceId?: string;
-  skipMessage?: string;
   [key: string]: unknown;
 }
 
@@ -178,7 +177,7 @@ export interface V2Baseline {
   summary?: string;
   license?: string;
   copyright?: string;
-  copyright_email?: string;
+  copyrightEmail?: string;
   supports?: unknown[];
   inputs?: unknown[];
   groups?: V2Group[];
@@ -211,8 +210,8 @@ export interface HDFV2Results {
 
 // ===== Severity Helpers =====
 
-/** Valid severity values per HDF v2.0 schema. */
-const VALID_SEVERITIES = new Set(['critical', 'high', 'medium', 'low', 'informational', 'none']);
+/** Valid severity values per HDF v2.0 schema (matches the Go converter). */
+const VALID_SEVERITIES = new Set(['critical', 'high', 'medium', 'low', 'informational']);
 
 /**
  * Convert tags.severity string to a valid severity value.
@@ -224,17 +223,10 @@ function tagSeverityToSeverity(tagSeverity: unknown): string | null {
   return VALID_SEVERITIES.has(normalized) ? normalized : null;
 }
 
-/**
- * Derive severity from numeric impact score.
- * Follows InSpec conventions: 0.9+ critical, 0.7+ high, 0.5+ medium, >0 low, 0 none.
- */
-function impactToSeverity(impact: number): string {
-  if (impact >= 0.9) return 'critical';
-  if (impact >= 0.7) return 'high';
-  if (impact >= 0.5) return 'medium';
-  if (impact > 0) return 'low';
-  return 'none';
-}
+// Severity is derived from numeric impact via the canonical
+// @mitre/hdf-utilities impactToSeverity (CVSS-aligned bands: >=0.9 critical,
+// >=0.7 high, >=0.4 medium, >0 low, else informational) — the same helper the
+// Go converter uses (hdfutil.ImpactToSeverity), so both languages agree.
 
 // ===== Conversion Functions =====
 
@@ -289,33 +281,31 @@ function computeEffectiveStatus(impact: number, results: V2Result[]): string {
  * Convert v1.0 result to v2.0 result.
  * Transforms snake_case field names to camelCase.
  */
+// Match the Go converter's startTime formatting: RFC3339 in UTC, dropping the
+// ".000" fraction Date#toISOString always adds when there are no milliseconds.
+function toRfc3339Z(s: string): string {
+  const d = new Date(s);
+  if (isNaN(d.getTime())) return s;
+  return d.toISOString().replace(/\.000Z$/, 'Z');
+}
+
+// Emits only schema-valid Requirement_Result fields, mirroring the Go converter
+// (converter.go convertResult): v1 resource_class becomes v2 `resource`, and
+// the non-schema legacy fields (resource, resource_params, skip_message) are
+// dropped rather than passed through (Requirement_Result is closed).
 function convertResult(v1Result: V1Result): V2Result {
   const v2Result: V2Result = {
     status: normalizeStatus(v1Result.status),
   };
 
-  // Transform snake_case to camelCase
   if (v1Result.code_desc !== undefined) v2Result.codeDesc = v1Result.code_desc;
   if (v1Result.run_time !== undefined) v2Result.runTime = v1Result.run_time;
-  if (v1Result.start_time !== undefined) v2Result.startTime = v1Result.start_time;
+  if (v1Result.start_time !== undefined) v2Result.startTime = toRfc3339Z(v1Result.start_time);
   if (v1Result.message !== undefined) v2Result.message = v1Result.message;
   if (v1Result.exception !== undefined) v2Result.exception = v1Result.exception;
   if (v1Result.backtrace !== undefined) v2Result.backtrace = v1Result.backtrace;
-  if (v1Result.resource_class !== undefined) v2Result.resourceClass = v1Result.resource_class;
-  if (v1Result.resource_params !== undefined) v2Result.resourceParams = v1Result.resource_params;
+  if (v1Result.resource_class !== undefined) v2Result.resource = v1Result.resource_class;
   if (v1Result.resource_id !== undefined) v2Result.resourceId = v1Result.resource_id;
-  if (v1Result.skip_message !== undefined) v2Result.skipMessage = v1Result.skip_message;
-
-  // Preserve any other fields
-  const knownFields = new Set([
-    'status', 'code_desc', 'run_time', 'start_time', 'message', 'exception',
-    'backtrace', 'resource_class', 'resource_params', 'resource_id', 'skip_message'
-  ]);
-  for (const [key, value] of Object.entries(v1Result)) {
-    if (!knownFields.has(key) && !(key in v2Result)) {
-      v2Result[key] = value;
-    }
-  }
 
   return v2Result;
 }
@@ -330,20 +320,17 @@ function convertControl(v1Control: V1Control): V2Requirement {
     impact: v1Control.impact,
   };
 
-  // Copy simple fields
+  // Copy simple fields. `desc` and `waiver_data` are intentionally dropped:
+  // neither is a valid v2 Requirement field (desc → descriptions; waivers are
+  // expressed via amendments/overrides in v2), matching the Go converter.
   if (v1Control.title !== undefined) v2Req.title = v1Control.title;
-  if (v1Control.desc !== undefined) v2Req.desc = v1Control.desc;
   if (v1Control.descriptions !== undefined) v2Req.descriptions = v1Control.descriptions;
-  if (v1Control.refs !== undefined) v2Req.refs = v1Control.refs;
   if (v1Control.tags !== undefined) v2Req.tags = v1Control.tags;
   if (v1Control.code !== undefined) v2Req.code = v1Control.code;
 
   // Transform snake_case to camelCase
   if (v1Control.source_location !== undefined) {
     v2Req.sourceLocation = v1Control.source_location;
-  }
-  if (v1Control.waiver_data !== undefined) {
-    v2Req.waiverData = v1Control.waiver_data;
   }
 
   // Transform status to effectiveStatus with normalization
@@ -383,16 +370,9 @@ function convertControl(v1Control: V1Control): V2Requirement {
   // field, so the source carries no such signal. Stamping a value would
   // fabricate data not present in the input.
 
-  // Preserve any other fields
-  const knownFields = new Set([
-    'id', 'title', 'desc', 'descriptions', 'impact', 'refs', 'tags', 'code',
-    'source_location', 'waiver_data', 'results', 'status'
-  ]);
-  for (const [key, value] of Object.entries(v1Control)) {
-    if (!knownFields.has(key) && !(key in v2Req)) {
-      v2Req[key] = value;
-    }
-  }
+  // No catch-all passthrough: v2 Requirement is a closed shape, and the Go
+  // converter emits only the explicit fields above. Carrying arbitrary leftover
+  // v1 keys would produce schema-invalid output and diverge from Go.
 
   return v2Req;
 }
@@ -477,9 +457,11 @@ function convertProfile(v1Profile: V1Profile): V2Baseline {
   if (v1Profile.summary !== undefined) v2Baseline.summary = v1Profile.summary;
   if (v1Profile.license !== undefined) v2Baseline.license = v1Profile.license;
   if (v1Profile.copyright !== undefined) v2Baseline.copyright = v1Profile.copyright;
-  if (v1Profile.copyright_email !== undefined) v2Baseline.copyright_email = v1Profile.copyright_email;
-  if (v1Profile.supports !== undefined) v2Baseline.supports = v1Profile.supports;
-  if (v1Profile.attributes !== undefined) v2Baseline.inputs = v1Profile.attributes;
+  if (v1Profile.copyright_email !== undefined) v2Baseline.copyrightEmail = v1Profile.copyright_email;
+  // Omit empty optional arrays so output matches the Go converter (which uses
+  // omitempty); only emit when there is data to carry.
+  if (v1Profile.supports?.length) v2Baseline.supports = v1Profile.supports;
+  if (v1Profile.attributes?.length) v2Baseline.inputs = v1Profile.attributes;
   if (v1Profile.status !== undefined) v2Baseline.status = v1Profile.status;
 
   // Transform sha256 to integrity object
@@ -501,8 +483,9 @@ function convertProfile(v1Profile: V1Profile): V2Baseline {
     v2Baseline.skipMessage = v1Profile.skip_message;
   }
 
-  // Transform groups (controls → requirements)
-  if (v1Profile.groups && Array.isArray(v1Profile.groups)) {
+  // Transform groups (controls → requirements). Omit when empty to match the
+  // Go converter (omitempty).
+  if (v1Profile.groups?.length) {
     v2Baseline.groups = v1Profile.groups.map(convertGroup);
   }
 
@@ -511,23 +494,13 @@ function convertProfile(v1Profile: V1Profile): V2Baseline {
     v2Baseline.requirements = v1Profile.controls.map(convertControl);
   }
 
-  // Transform depends
-  if (v1Profile.depends && Array.isArray(v1Profile.depends)) {
+  // Transform depends. Omit when empty to match the Go converter.
+  if (v1Profile.depends?.length) {
     v2Baseline.depends = v1Profile.depends.map(convertDependency);
   }
 
-  // Preserve any other fields
-  const knownFields = new Set([
-    'name', 'version', 'title', 'maintainer', 'summary', 'license', 'copyright',
-    'copyright_email', 'supports', 'attributes', 'groups', 'controls', 'sha256',
-    'depends', 'parent_profile', 'status', 'status_message', 'skip_message'
-  ]);
-  for (const [key, value] of Object.entries(v1Profile)) {
-    if (!knownFields.has(key) && !(key in v2Baseline)) {
-      v2Baseline[key] = value;
-    }
-  }
-
+  // No catch-all passthrough: the Go converter emits only the explicit fields
+  // above, and the v2 baseline is a closed shape.
   return v2Baseline;
 }
 
@@ -562,17 +535,18 @@ export function convertV1ToV2(v1Data: HDFV1Results): HDFV2Results {
     statistics: v1Data.statistics || {},
   };
 
-  // Transform platform to components array
+  // Transform platform to components array. Mirrors the Go converter: emit only
+  // {type, name}, adding osName/osVersion when the platform carries a target_id.
   if (v1Data.platform) {
-    v2.components = [
-      {
-        type: 'host', // v2.0 uses 'host' instead of 'system'
-        id: v1Data.platform.target_id || v1Data.platform.name,
-        name: v1Data.platform.name,
-        ...(v1Data.platform.release && { release: v1Data.platform.release }),
-        labels: {},
-      },
-    ];
+    const component: { type: string; name: string; osName?: string; osVersion?: string } = {
+      type: 'host', // v2.0 uses 'host' instead of 'system'
+      name: v1Data.platform.name,
+    };
+    if (v1Data.platform.target_id) {
+      component.osName = v1Data.platform.name;
+      if (v1Data.platform.release !== undefined) component.osVersion = v1Data.platform.release;
+    }
+    v2.components = [component];
   }
 
   // Copy optional fields

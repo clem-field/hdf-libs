@@ -3,33 +3,27 @@
     {
       "name": "test-profile",
       "version": "1.0.0",
-      "supports": [],
-      "inputs": [],
       "integrity": {
         "algorithm": "sha256",
         "checksum": "abc123"
       },
-      "groups": [],
       "requirements": [
         {
           "id": "test-1",
           "impact": 0.5,
           "title": "Test Control",
-          "desc": "Test description",
           "descriptions": [
             {
               "label": "default",
               "data": "Test description"
             }
           ],
-          "refs": [],
           "tags": {},
           "code": "control 'test-1' do\nend",
           "sourceLocation": {
             "ref": "test.rb",
             "line": 1
           },
-          "waiverData": {},
           "results": [
             {
               "status": "passed",
@@ -41,8 +35,7 @@
           "effectiveStatus": "passed",
           "severity": "medium"
         }
-      ],
-      "depends": []
+      ]
     }
   ],
   "statistics": {
@@ -51,10 +44,7 @@
   "components": [
     {
       "type": "host",
-      "id": "test-system",
-      "name": "test-system",
-      "release": "1.0",
-      "labels": {}
+      "name": "test-system"
     }
   ],
   "tool": {

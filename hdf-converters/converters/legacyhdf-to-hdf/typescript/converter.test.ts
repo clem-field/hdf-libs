@@ -38,10 +38,10 @@ describe('HDF v1.0 to v2.0 Converter', () => {
       expect(v2.baselines).toEqual([]);
       expect(v2.statistics).toEqual({});
       expect(v2.components).toHaveLength(1);
-      expect(v2.components![0]).toMatchObject({
+      // No target_id → component is just {type, name} (mirrors Go).
+      expect(v2.components![0]).toEqual({
         type: 'host',
         name: 'ubuntu',
-        release: '20.04',
       });
       expect(v2.tool?.name).toBe('Heimdall Data Format v1');
       expect(v2.tool?.version).toBeUndefined();
@@ -78,16 +78,17 @@ describe('HDF v1.0 to v2.0 Converter', () => {
       const v2 = convertV1ToV2(v1);
 
       expect(v2.components).toHaveLength(1);
+      // Mirrors the Go converter: {type, name} plus osName/osVersion when the
+      // platform carries a target_id. No id/release/labels.
       expect(v2.components![0]).toEqual({
         type: 'host',
-        id: 'server-123',
         name: 'redhat',
-        release: '8.5',
-        labels: {},
+        osName: 'redhat',
+        osVersion: '8.5',
       });
     });
 
-    it('should use platform name as target id if target_id not provided', () => {
+    it('should emit only {type,name} when target_id is absent', () => {
       const v1: HDFV1Results = {
         version: '1.0.0',
         platform: { name: 'debian' },
@@ -97,7 +98,7 @@ describe('HDF v1.0 to v2.0 Converter', () => {
 
       const v2 = convertV1ToV2(v1);
 
-      expect(v2.components![0].id).toBe('debian');
+      expect(v2.components![0]).toEqual({ type: 'host', name: 'debian' });
     });
 
     it('should preserve generator information', () => {
@@ -187,9 +188,7 @@ describe('HDF v1.0 to v2.0 Converter', () => {
 
       expect(v2.components![0]).toEqual({
         type: 'host',
-        id: 'test-system',
         name: 'test-system',
-        labels: {},
       });
       expect(v2.components![0]).not.toHaveProperty('release');
     });
@@ -277,10 +276,28 @@ describe('HDF v1.0 to v2.0 Converter', () => {
       expect(result.message).toBe('Test message');
       expect(result.exception).toBe('TestException');
       expect(result.backtrace).toEqual(['line1', 'line2']);
-      expect(result.resourceClass).toBe('File');
-      expect(result.resourceParams).toEqual({ path: '/test' });
+      // v1 resource_class maps to the v2 `resource` field (mirrors Go).
+      expect(result.resource).toBe('File');
       expect(result.resourceId).toBe('/etc/test');
-      expect(result.skipMessage).toBe('Test skip');
+      // resourceClass/resourceParams/skipMessage are not Requirement_Result
+      // fields and are intentionally dropped.
+      expect(result.resourceClass).toBeUndefined();
+      expect(result.resourceParams).toBeUndefined();
+      expect(result.skipMessage).toBeUndefined();
+    });
+
+    it('leaves an unparseable start_time unchanged', () => {
+      const v1: HDFV1Results = {
+        version: '1.0.0',
+        platform: { name: 'test' },
+        profiles: [{
+          name: 'p',
+          controls: [{ id: 'c', impact: 0.5, results: [{ status: 'passed', start_time: 'not-a-date' }] }],
+        }],
+        statistics: {},
+      };
+      const v2 = convertV1ToV2(v1);
+      expect(v2.baselines[0].requirements![0].results[0].startTime).toBe('not-a-date');
     });
 
     it('should convert all control/requirement optional fields', () => {
@@ -311,14 +328,15 @@ describe('HDF v1.0 to v2.0 Converter', () => {
       const req = v2.baselines[0].requirements![0];
 
       expect(req.title).toBe('Test Title');
-      expect(req.desc).toBe('Test Description');
       expect(req.descriptions).toEqual([{ label: 'default', data: 'Test' }]);
-      expect(req.refs).toEqual([{ url: 'https://example.com' }]);
       expect(req.tags).toEqual({ nist: ['AC-1'] });
       expect(req.code).toBe('describe "test" do\nend');
       expect(req.sourceLocation).toEqual({ ref: 'test.rb', line: 10 });
-      expect(req.waiverData).toEqual({ expiration: '2025-01-01' });
       expect(req.effectiveStatus).toBe('notApplicable');
+      // desc and waiver_data are not valid v2 Requirement fields (desc →
+      // descriptions; waivers are amendments in v2) and are dropped, matching Go.
+      expect(req.desc).toBeUndefined();
+      expect(req.waiverData).toBeUndefined();
     });
 
     it('should convert all status values correctly', () => {
@@ -476,7 +494,7 @@ describe('HDF v1.0 to v2.0 Converter', () => {
       expect(baseline.summary).toBe('Test Summary');
       expect(baseline.license).toBe('Apache-2.0');
       expect(baseline.copyright).toBe('Copyright 2024');
-      expect(baseline.copyright_email).toBe('test@example.com');
+      expect(baseline.copyrightEmail).toBe('test@example.com');
       expect(baseline.supports).toEqual([{ platform: 'ubuntu' }]);
       expect(baseline.inputs).toEqual([{ name: 'attr1', options: {} }]);
       expect(baseline.status).toBe('loaded');
@@ -486,7 +504,7 @@ describe('HDF v1.0 to v2.0 Converter', () => {
       expect(baseline.skipMessage).toBe('Skip message');
     });
 
-    it('should preserve unknown fields in results', () => {
+    it('should drop unknown fields in results (closed v2 shape)', () => {
       const v1: HDFV1Results = {
         version: '1.0.0',
         platform: { name: 'test' },
@@ -505,10 +523,12 @@ describe('HDF v1.0 to v2.0 Converter', () => {
       };
 
       const v2 = convertV1ToV2(v1);
-      expect(v2.baselines[0].requirements![0].results[0]).toHaveProperty('custom_field', 'custom_value');
+      // Requirement_Result is a closed schema shape; unknown v1 fields are not
+      // carried (matches the Go converter).
+      expect(v2.baselines[0].requirements![0].results[0]).not.toHaveProperty('custom_field');
     });
 
-    it('should preserve unknown fields in controls', () => {
+    it('should drop unknown fields in controls (closed v2 shape)', () => {
       const v1: HDFV1Results = {
         version: '1.0.0',
         platform: { name: 'test' },
@@ -525,7 +545,7 @@ describe('HDF v1.0 to v2.0 Converter', () => {
       };
 
       const v2 = convertV1ToV2(v1);
-      expect(v2.baselines[0].requirements![0]).toHaveProperty('custom_control_field', 'custom');
+      expect(v2.baselines[0].requirements![0]).not.toHaveProperty('custom_control_field');
     });
 
     it('should preserve unknown fields in groups', () => {
@@ -567,7 +587,7 @@ describe('HDF v1.0 to v2.0 Converter', () => {
       expect(v2.baselines[0].depends![0]).toHaveProperty('custom_dep_field', 'custom');
     });
 
-    it('should preserve unknown fields in profiles/baselines', () => {
+    it('should drop unknown fields in profiles/baselines (closed v2 shape)', () => {
       const v1: HDFV1Results = {
         version: '1.0.0',
         platform: { name: 'test' },
@@ -580,7 +600,7 @@ describe('HDF v1.0 to v2.0 Converter', () => {
       };
 
       const v2 = convertV1ToV2(v1);
-      expect(v2.baselines[0]).toHaveProperty('custom_profile_field', 'custom');
+      expect(v2.baselines[0]).not.toHaveProperty('custom_profile_field');
     });
   });
 
@@ -618,10 +638,12 @@ describe('HDF v1.0 to v2.0 Converter', () => {
     it('should map platform to target', () => {
       const v2 = convertV1ToV2(v1);
       expect(v2.components).toHaveLength(1);
-      expect(v2.components![0]).toMatchObject({
+      // target_id present → osName/osVersion populated (mirrors Go).
+      expect(v2.components![0]).toEqual({
         type: 'host',
         name: 'redhat',
-        release: '9.7',
+        osName: 'redhat',
+        osVersion: '9.7',
       });
     });
 
@@ -988,7 +1010,7 @@ describe('HDF v1.0 to v2.0 Converter', () => {
         { impact: 0.7, expected: 'high' },
         { impact: 0.5, expected: 'medium' },
         { impact: 0.3, expected: 'low' },
-        { impact: 0, expected: 'none' }, // NA control without tags.severity
+        { impact: 0, expected: 'informational' }, // canonical bands: 0 → informational (never 'none')
       ];
       for (const { impact, expected } of cases) {
         const v1: HDFV1Results = {
@@ -1142,5 +1164,20 @@ describe('HDF v1.0 to v2.0 Converter', () => {
 
       expect(isHDFV1(data)).toBe(false);
     });
+  });
+});
+
+// Pins Go↔TS parity for the three-layer-overlay fixture (bead hdf-libs-rf06):
+// the committed snapshot is generated from the Go converter, so asserting the
+// TS output equals it byte-for-byte locks both languages to identical output.
+describe('three-layer-overlay parity snapshot', () => {
+  it('TS output equals the committed (Go-generated) snapshot and is schema-valid', () => {
+    const v1 = JSON.parse(readFileSync(inputFixturePath('three-layer-overlay.json'), 'utf-8')) as HDFV1Results;
+    const v2 = convertV1ToV2(v1);
+    expectValidResults(v2);
+    const expected = JSON.parse(
+      readFileSync(join(FIXTURES_DIR, 'expected', 'three-layer-overlay.json'), 'utf-8'),
+    );
+    expect(v2).toEqual(expected);
   });
 });

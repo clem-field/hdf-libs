@@ -127,14 +127,7 @@ func assertHDFShapedDataValid(t *testing.T, data []byte, sourcePath string) {
 // schema validation today, with a tracking note. Each entry should map to
 // a follow-up bead. The gate is allowed to skip these so the rest of the
 // gate runs, but new entries should NOT be added casually.
-var knownInvalidExpectedFixtures = map[string]string{
-	// Snapshot predates the Severity enum tightening (uses "none" before the
-	// schema restricted to critical/high/medium/low/informational). Regenerating
-	// surfaces a separate Go-vs-TS structural divergence in the legacyhdf
-	// converter that needs its own bead before the snapshot can be refreshed.
-	// Tracking: bd hdf-libs-rf06.
-	"legacyhdf-to-hdf/three-layer-overlay.json": "stale snapshot; regenerate after fixing Go/TS divergence (bd hdf-libs-rf06)",
-}
+var knownInvalidExpectedFixtures = map[string]string{}
 
 // TestAllConverterExpectedFixturesAreSchemaValid runs every committed
 // fixtures/expected/*.hdf.json snapshot through the appropriate HDF
