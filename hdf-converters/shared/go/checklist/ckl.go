@@ -106,6 +106,12 @@ func ParseCKL(input []byte) (*Checklist, error) {
 
 	for i := range doc.Stigs.IStigs {
 		is := &doc.Stigs.IStigs[i]
+		// An iSTIG with no rules would yield requirements: [] downstream, which
+		// violates the HDF schema's requirements.minItems=1. Reject as malformed,
+		// consistent with the no-<iSTIG> guard above.
+		if len(is.Vulns) == 0 {
+			return nil, fmt.Errorf("parse ckl: <iSTIG> block %d contains no <VULN> rules", i+1)
+		}
 		stig := Stig{
 			StigID:         siValue(is.StigInfo.SiData, "stigid"),
 			Title:          siValue(is.StigInfo.SiData, "title"),

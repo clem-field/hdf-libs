@@ -82,7 +82,14 @@ export function parseCkl(input: string): Checklist {
     webDBInstance: str(a['WEB_DB_INSTANCE']),
   };
 
-  const stigs: Stig[] = istigs.map((is) => {
+  const stigs: Stig[] = istigs.map((is, i) => {
+    // An iSTIG with no rules would yield requirements: [] downstream, which
+    // violates the HDF schema's requirements.minItems=1. Reject as malformed,
+    // consistent with the no-<iSTIG> guard above.
+    const vulns = is.VULN ?? [];
+    if (vulns.length === 0) {
+      throw new Error(`parse ckl: <iSTIG> block ${i + 1} contains no <VULN> rules`);
+    }
     const si = is.STIG_INFO?.SI_DATA ?? [];
     const siVal = (name: string): string =>
       str(si.find((d) => d.SID_NAME === name)?.SID_DATA);
@@ -93,7 +100,7 @@ export function parseCkl(input: string): Checklist {
       releaseInfo: siVal('releaseinfo'),
       uuid: siVal('uuid'),
       classification: siVal('classification'),
-      vulns: (is.VULN ?? []).map(cklVulnToModel),
+      vulns: vulns.map(cklVulnToModel),
     };
   });
 

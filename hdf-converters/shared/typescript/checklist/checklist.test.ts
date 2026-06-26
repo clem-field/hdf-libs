@@ -231,6 +231,17 @@ describe('checklist shared model', () => {
     expect(() => hdfToChecklist('{"baselines":[]}')).toThrow();
   });
 
+  // An iSTIG/stig with zero rules would yield requirements: [] downstream,
+  // violating the HDF schema's minItems=1; both are rejected as malformed.
+  it('rejects an iSTIG with no VULN rules', () => {
+    const xml = '<?xml version="1.0" encoding="UTF-8"?><CHECKLIST><STIGS><iSTIG><STIG_INFO></STIG_INFO></iSTIG></STIGS></CHECKLIST>';
+    expect(() => parseCkl(xml)).toThrow(/no <VULN> rules/);
+  });
+
+  it('rejects a CKLB stig with empty rules[]', () => {
+    expect(() => parseCklb('{"cklb_version":"1.0","stigs":[{"stig_id":"x","rules":[]}]}')).toThrow(/no rules\[\]/);
+  });
+
   // --- field/branch variations -------------------------------------------
 
   it('component name falls back to FQDN then IP when host name is absent', () => {

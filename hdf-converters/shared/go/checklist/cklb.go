@@ -102,6 +102,12 @@ func ParseCKLB(input []byte) (*Checklist, error) {
 
 	for i := range doc.Stigs {
 		s := &doc.Stigs[i]
+		// A stig with no rules would yield requirements: [] downstream, which
+		// violates the HDF schema's requirements.minItems=1. Reject as malformed,
+		// consistent with the empty-stigs[] guard above.
+		if len(s.Rules) == 0 {
+			return nil, fmt.Errorf("parse cklb: stigs[%d] contains no rules[]", i)
+		}
 		stig := Stig{
 			StigID:              s.StigID,
 			Title:               orDefault(s.StigName, s.DisplayName),

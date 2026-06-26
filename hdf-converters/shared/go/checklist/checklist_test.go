@@ -136,6 +136,23 @@ func TestParseCKLB(t *testing.T) {
 	assert.Equal(t, StatusOpen, v.Status)
 }
 
+// An iSTIG with zero <VULN> rules is rejected — it would otherwise yield a
+// baseline with requirements: [], violating the HDF schema's minItems=1.
+func TestParseCKLRejectsEmptyIStig(t *testing.T) {
+	input := `<?xml version="1.0" encoding="UTF-8"?><CHECKLIST><STIGS><iSTIG><STIG_INFO></STIG_INFO></iSTIG></STIGS></CHECKLIST>`
+	_, err := ParseCKL([]byte(input))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no <VULN> rules")
+}
+
+// A CKLB stig with an empty rules[] is rejected for the same reason.
+func TestParseCKLBRejectsEmptyRules(t *testing.T) {
+	input := `{"cklb_version":"1.0","stigs":[{"stig_id":"x","rules":[]}]}`
+	_, err := ParseCKLB([]byte(input))
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "no rules[]")
+}
+
 // CKL and CKLB of the same checklist should produce equivalent models.
 func TestCKLandCKLBEquivalentModel(t *testing.T) {
 	ckl, err := ParseCKL([]byte(sampleCKL))

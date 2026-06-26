@@ -75,16 +75,25 @@ export function parseCklb(input: string): Checklist {
     classification: nz(t.classification),
   };
 
-  const stigs: Stig[] = doc.stigs.map((s) => ({
-    stigID: nz(s.stig_id),
-    title: nz(s.stig_name) || nz(s.display_name),
-    displayName: nz(s.display_name),
-    version: nz(s.version),
-    releaseInfo: nz(s.release_info),
-    uuid: nz(s.uuid),
-    referenceIdentifier: nz(s.reference_identifier),
-    vulns: (s.rules ?? []).map(cklbRuleToModel),
-  }));
+  const stigs: Stig[] = doc.stigs.map((s, i) => {
+    // A stig with no rules would yield requirements: [] downstream, which
+    // violates the HDF schema's requirements.minItems=1. Reject as malformed,
+    // consistent with the empty-stigs[] guard above.
+    const rules = s.rules ?? [];
+    if (rules.length === 0) {
+      throw new Error(`parse cklb: stigs[${i}] contains no rules[]`);
+    }
+    return {
+      stigID: nz(s.stig_id),
+      title: nz(s.stig_name) || nz(s.display_name),
+      displayName: nz(s.display_name),
+      version: nz(s.version),
+      releaseInfo: nz(s.release_info),
+      uuid: nz(s.uuid),
+      referenceIdentifier: nz(s.reference_identifier),
+      vulns: rules.map(cklbRuleToModel),
+    };
+  });
 
   return { format: 'cklb', cklbVersion: nz(doc.cklb_version), asset, stigs };
 }
