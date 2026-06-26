@@ -59,9 +59,22 @@ export async function convertOscalSarToHdf(input: string): Promise<string> {
   const sar = doc['assessment-results'];
   const meta = extractMetadata(sar.metadata);
 
+  // One conversion-time value, shared as the startTime fallback for any
+  // finding whose OSCAL result lacks a usable start.
+  const scanTime = new Date();
+
+  // Skip results with no findings — an empty baseline would violate the
+  // schema's requirements.minItems=1. Mirrors the Go SAR converter.
   const baselines: EvaluatedBaseline[] = [];
   for (const result of sar.results) {
-    const baseline = await resultToEvaluatedBaseline(result, sar, input);
+    if (!result.findings || result.findings.length === 0) {
+      // eslint-disable-next-line no-console
+      console.warn(
+        `WARNING: Skipping assessment result "${result.title || result.uuid}": no findings (empty result set)`,
+      );
+      continue;
+    }
+    const baseline = await resultToEvaluatedBaseline(result, sar, input, scanTime);
     baselines.push(baseline);
   }
 
@@ -98,6 +111,7 @@ async function resultToEvaluatedBaseline(
   result: AssessmentResult,
   sar: SecurityAssessmentResultsSAR,
   rawInput: string,
+  scanTime: Date,
 ): Promise<EvaluatedBaseline> {
   const checksum = await inputChecksum(rawInput);
 
@@ -124,7 +138,7 @@ async function resultToEvaluatedBaseline(
   const requirements: EvaluatedRequirement[] = [];
   for (const controlId of controlOrder) {
     const findings = controlMap.get(controlId)!;
-    const req = findingsToEvaluatedRequirement(controlId, findings, obsMap, riskMap, result);
+    const req = findingsToEvaluatedRequirement(controlId, findings, obsMap, riskMap, result, scanTime);
     requirements.push(req);
   }
 
@@ -151,6 +165,7 @@ function findingsToEvaluatedRequirement(
   obsMap: Map<string, Observation>,
   riskMap: Map<string, IdentifiedRisk>,
   result: AssessmentResult,
+  scanTime: Date,
 ): EvaluatedRequirement {
   const nistTag = controlIdToNistTag(controlId);
 
@@ -167,7 +182,7 @@ function findingsToEvaluatedRequirement(
   // Build results from each finding
   const results: RequirementResult[] = [];
   for (const f of findings) {
-    results.push(findingToRequirementResult(f, obsMap, riskMap, result));
+    results.push(findingToRequirementResult(f, obsMap, riskMap, result, scanTime));
   }
 
   const tags: Record<string, unknown> = {
@@ -185,15 +200,18 @@ function findingToRequirementResult(
   obsMap: Map<string, Observation>,
   riskMap: Map<string, IdentifiedRisk>,
   result: AssessmentResult,
+  scanTime: Date,
 ): RequirementResult {
   const status = mapFindingStatus(f);
   const codeDesc = buildCodeDesc(f, obsMap);
   const message = buildRiskMessage(f, riskMap);
+  // The OSCAL result's assessment-period start applies to all its findings;
+  // fall back to the single conversion-time value when the source omits it.
   const startTime = parseResultStartTime(result);
 
   return createResult(status, message || undefined, {
     codeDesc,
-    startTime: startTime.getTime() > 0 ? startTime : undefined,
+    startTime: startTime.getTime() > 0 ? startTime : scanTime,
   });
 }
 
