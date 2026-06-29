@@ -20,6 +20,20 @@ runConverterContractTests({
   minimalFixture: 'minimal.json',
 });
 
+describe('timestamp parse fallback', () => {
+  it('uses conversion time when createdDateTime is unparseable', async () => {
+    const input = loadFixture('minimal.json').replace(/2024-01-01T00:00:00Z/g, 'not-a-date');
+    const hdf = JSON.parse(await convertMsftSecureScoreToHdf(input)) as HDFResults;
+    expectValidResults(hdf);
+  });
+
+  it('uses conversion time when createdDateTime is absent', async () => {
+    const input = loadFixture('minimal.json').replace(/"createdDateTime"/g, '"createdDateTimeAbsent"');
+    const hdf = JSON.parse(await convertMsftSecureScoreToHdf(input)) as HDFResults;
+    expectValidResults(hdf);
+  });
+});
+
 describe('msft-secure-score to HDF converter', async () => {
   describe('input validation', async () => {
     it('should throw when secureScore is missing', async () => {
@@ -186,7 +200,7 @@ describe('msft-secure-score to HDF converter', async () => {
     it('should set start_time from createdDateTime', async () => {
       const hdf = JSON.parse(await convertMsftSecureScoreToHdf(loadFixture('minimal.json'))) as HDFResults;
       const req = hdf.baselines[0]!.requirements.find(r => r.id === 'Apps:McasFirewallLogUpload');
-      expect(req?.results[0]?.startTime).toBeTruthy();
+      expect(req?.results[0]?.startTime).toBe('2024-01-01T00:00:00Z');
     });
   });
 
