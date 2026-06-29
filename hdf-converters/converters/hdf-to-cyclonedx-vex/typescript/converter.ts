@@ -15,7 +15,7 @@ import {
   type HDFAmendments,
   type StandaloneOverride,
 } from '@mitre/hdf-schema';
-import { parseJSON } from '@mitre/hdf-utilities';
+import { parseJSON, formatTimestampSeconds } from '@mitre/hdf-utilities';
 import { validateInputSize } from '../../../shared/typescript/converterutil.js';
 import {
   affectedPackageToIdentifier,
@@ -243,7 +243,7 @@ function buildMetadata(
   converterVersion: string,
 ): BOM['metadata'] {
   const metadata: BOM['metadata'] = {
-    timestamp: docTime.toISOString().replace(/\.\d+Z$/, 'Z'),
+    timestamp: formatTimestampSeconds(docTime),
     tools: [{ vendor: 'mitre', name: 'hdf-to-cyclonedx-vex', version: converterVersion }],
   };
   if (a.appliedBy?.identifier) {

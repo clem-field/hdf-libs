@@ -13,7 +13,7 @@ import {
   type HDFAmendments,
   type StandaloneOverride,
 } from '@mitre/hdf-schema';
-import { parseJSON } from '@mitre/hdf-utilities';
+import { parseJSON, formatTimestampSeconds } from '@mitre/hdf-utilities';
 import { validateInputSize } from '../../../shared/typescript/converterutil.js';
 import {
   affectedPackageToIdentifier,
@@ -176,7 +176,7 @@ function buildVulnerability(group: CveGroup): Vulnerability | undefined {
         v.flags.push({
           label: String(o.justification as Justification),
           product_ids: pids,
-          date: new Date(o.appliedAt).toISOString().replace(/\.\d+Z$/, 'Z'),
+          date: formatTimestampSeconds(new Date(o.appliedAt)),
         });
       }
       emitted = true;
@@ -246,7 +246,7 @@ function buildDocument(
   amendments: HDFAmendments,
   converterVersion: string,
 ): CSAFVexDocument {
-  const now = new Date().toISOString().replace(/\.\d+Z$/, 'Z');
+  const now = formatTimestampSeconds(new Date());
   const publisherName = amendments.appliedBy?.identifier || 'HDF Amendments Export';
   const trackingId = amendments.amendmentId || 'HDF-VEX-EXPORT';
   const docVersion = amendments.version || '1';

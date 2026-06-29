@@ -3,6 +3,7 @@ import {
   stripHtml,
   parseTimestamp,
   formatTimestamp,
+  formatTimestampSeconds,
   trimUtcFraction,
 } from '../src/string/index.js';
 
@@ -141,5 +142,19 @@ describe('formatTimestamp', () => {
 
   it('normalizes an offset-bearing instant to UTC', () => {
     expect(formatTimestamp(new Date('2026-02-22T15:57:06-05:00'))).toBe('2026-02-22T20:57:06Z');
+  });
+});
+
+describe('formatTimestampSeconds', () => {
+  it('drops all fractional seconds (whole-second UTC)', () => {
+    expect(formatTimestampSeconds(new Date('2024-11-15T10:30:00.123Z'))).toBe('2024-11-15T10:30:00Z');
+  });
+
+  it('leaves a whole-second timestamp unchanged', () => {
+    expect(formatTimestampSeconds(new Date('2024-11-15T10:30:00Z'))).toBe('2024-11-15T10:30:00Z');
+  });
+
+  it('normalizes an offset-bearing instant to whole-second UTC', () => {
+    expect(formatTimestampSeconds(new Date('2026-02-22T15:57:06.5-05:00'))).toBe('2026-02-22T20:57:06Z');
   });
 });

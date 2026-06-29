@@ -6,7 +6,7 @@
  * status, justification) survive round-trip; the rest collapse.
  */
 
-import { parseJSON, sha256 } from '@mitre/hdf-utilities';
+import { parseJSON, sha256, formatTimestampSeconds } from '@mitre/hdf-utilities';
 import {
   MilestoneStatus,
   OverrideType,
@@ -79,7 +79,7 @@ export async function convertHdfToOpenVex(
     '@id': await buildDocumentID(input, amendments),
     author,
     role,
-    timestamp: (earliest ?? new Date()).toISOString().replace(/\.\d+Z$/, 'Z'),
+    timestamp: formatTimestampSeconds(earliest ?? new Date()),
     version: 1,
     statements,
   };
@@ -106,7 +106,7 @@ function overrideToStatement(o: StandaloneOverride): Statement | undefined {
       '@id': `https://nvd.nist.gov/vuln/detail/${o.requirementId}`,
     },
     status: String(canonical),
-    timestamp: new Date(o.appliedAt).toISOString().replace(/\.\d+Z$/, 'Z'),
+    timestamp: formatTimestampSeconds(new Date(o.appliedAt)),
     products: productsFor(o),
   };
 

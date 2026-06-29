@@ -98,3 +98,16 @@ export function trimUtcFraction(s: string): string {
 export function formatTimestamp(d: Date): string {
   return trimUtcFraction(d.toISOString());
 }
+
+/**
+ * Format a Date as RFC3339 in UTC truncated to whole seconds (no fractional
+ * part). For exporters whose target format conventionally uses whole-second
+ * timestamps (CSAF, OpenVEX, CycloneDX). Use {@link formatTimestamp} for
+ * canonical HDF output instead — it preserves sub-second precision.
+ *
+ * @example
+ *   formatTimestampSeconds(new Date('2024-11-15T10:30:00.123Z')); // '2024-11-15T10:30:00Z'
+ */
+export function formatTimestampSeconds(d: Date): string {
+  return d.toISOString().replace(/\.\d+Z$/, 'Z');
+}
