@@ -3,8 +3,8 @@ module github.com/mitre/hdf-libs/hdf-diff/go/v3
 go 1.26.4
 
 require (
-	github.com/mitre/hdf-libs/hdf-schema/dist/go/v3 v3.3.0
-	github.com/mitre/hdf-libs/hdf-utilities/go/v3 v3.3.0
+	github.com/mitre/hdf-libs/hdf-schema/dist/go/v3 v3.3.1
+	github.com/mitre/hdf-libs/hdf-utilities/go/v3 v3.3.1
 	github.com/protobom/protobom v0.5.4
 	github.com/stretchr/testify v1.11.1
 )

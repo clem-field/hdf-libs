@@ -2,16 +2,32 @@
 
 All notable changes to this project will be documented in this file.
 
-## [Unreleased]
+## [3.3.1] - 2026-06-28
+
+Patch release: the NIST Rev 5 default flip, a workspace-wide UTC timestamp
+normalization that makes converter output byte-identical across TypeScript and
+Go, and several converter fixes. No schema changes — the schema `$id` URLs stay
+at v3.3.0.
 
 ### New Features
 
 - **Selectable NIST SP 800-53 revision.** NIST-emitting mappings are now revision-aware, carrying both Rev 4 and Rev 5 data. A process-global default revision drives every converter that emits NIST control tags; `hdf convert --nist-rev <4|5>` overrides it per invocation. For explicit, side-effect-free selection the libraries expose per-call `*ForRevision` lookups (Go) and an optional `rev` argument on each lookup (TS). (hdf-libs-9sh5)
 - **AWS Config revision-alignment guard.** When an AWS Config export references managed rules that are mapped only at a NIST revision other than the one selected, `aws-config-to-hdf` logs one aggregated warning naming the rules and the revision that covers them — their NIST tags are omitted rather than silently dropped without explanation. `hdf convert --nist-strict` promotes that warning to a hard error. Rules unmapped at every revision are not flagged (a coverage gap, not a revision mismatch). (hdf-libs-9sh5)
+- **Legacy InSpec (HDF v1) input converts to any export target.** `hdf convert` now upgrades legacy `hdf@1` / InSpec exec-json input in-flight (v1→v2) when the target is a non-HDF export format, instead of failing on the missing modern shape. (#112; closes #104 pt 1)
+- **NDJSON input auto-detection.** The converter registry detects newline-delimited JSON (e.g. `trufflehog --json`) without a manual format hint. (#105)
 
-### Breaking Changes
+### Fixes
+
+- **All converter timestamps are normalized to UTC (trimmed RFC3339) and are now byte-identical across TypeScript and Go.** Previously the two implementations could emit different strings for the same instant — TypeScript read zone-less timestamps as host-local while Go read them as UTC, and they diverged on source offset and fractional-second formatting. Parsing/formatting now flows through shared helpers (`parseTimestamp` / `hdfutil.ParseTimestamp`, `NormalizeTimestamp`, `formatTimestamp` / `formatTimestampSeconds`, `serializeHdf`) that coerce every timestamp to UTC at millisecond precision — covering ISO, InSpec, C ctime (Nessus), and vendor formats (Netsparker, ZAP, DBProtect, Veracode). The schema-required result `startTime` always falls back to a valid value. An ESLint rule and a `pnpm lint:timestamps` check guard against regressions. (#115, #116, #117; hdf-libs-jmd0, hdf-libs-d2ql, hdf-libs-4dur, hdf-libs-2v64, hdf-libs-6gpa)
+- **Every converter result now emits the schema-required `startTime`.** Several TypeScript importers previously omitted it (schema-invalid output); `oscal-sar` now skips zero-finding assessment results rather than emitting empty baselines, and CycloneDX / JUnit / Defender derive the document timestamp from source data instead of conversion time. (#114; hdf-libs-je13)
+- **Leading UTF-8 BOM stripped from CLI input** before format detection; a BOM-only file now reports "no input provided" instead of a parse error. (#106)
+- **CKL / CKLB with an empty inner rule set is rejected as malformed** at parse time, instead of silently producing an empty baseline. (hdf-libs-5u83)
+- **`legacyhdf-to-hdf` TypeScript output aligned to Go for byte-parity** — drops non-schema legacy fields, maps `resource_class` → `resource`, emits trimmed-UTC `startTime`, and omits empty arrays. (hdf-libs-rf06)
+
+### Breaking Changes — Converters
 
 - **The default NIST SP 800-53 revision is now Rev 5 (was Rev 4).** Rev 4 was withdrawn in September 2023; Rev 5 is the current catalog. Converters that emit NIST control tags — most visibly `aws-config-to-hdf` — now emit Rev 5 control identifiers by default. For example, the `access-keys-rotated` rule maps to `AC-3(15)` instead of `AC-2(1) | AC-2(j)`. CWE→NIST mappings are unaffected: the control identifiers are identical across revisions (only control names were refreshed), so CWE-based converters produce the same tags as before. To retain Rev 4 output, pass `--nist-rev 4`. (hdf-libs-9sh5)
+- **Converter timestamps that previously preserved a source UTC offset now emit UTC.** As part of the normalization above, a converter fed a non-UTC offset (e.g. `…-05:00`) now emits the equivalent `…Z` instant — the point in time is unchanged, only the rendering. Most visible in `legacyhdf`, `xccdf-results`, `splunk`, `sonarqube`, and `scoutsuite` output for offset-bearing source data.
 
 ## [3.3.0] - 2026-06-17
 
