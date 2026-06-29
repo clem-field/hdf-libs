@@ -2,6 +2,19 @@
 
 All notable changes to this project will be documented in this file.
 
+## [3.3.2] - 2026-06-29
+
+Patch release: a legacy-HDF (InSpec v1) converter fidelity fix. No schema
+changes — the schema `$id` URLs stay at v3.3.0.
+
+### Fixes
+
+- **`legacyhdf-to-hdf` now preserves four valid v1 fields it previously dropped**, mapping each to its v2 home in both TypeScript and Go (output kept identical across the two): control `refs` → `Requirement.refs` (empty/contentless refs dropped); result `skip_message` → result `message` when no explicit message is present (the skip reason was being lost on ~35% of real InSpec results); profile `supports` → `EvaluatedBaseline.supports` (InSpec hyphenated keys mapped to the schema's camelCase fields); and a platform `release` with no `target_id` now populates the component's `osName`/`osVersion` instead of being discarded. (#120; hdf-libs-9q8o)
+
+### Compatibility
+
+- Additive only: for the same legacy-HDF input the converter now emits more fields than before; no fields were renamed or removed, and output remains schema-valid. v3.3.x documents are unaffected (the change is in the v1→v2 upgrade path).
+
 ## [3.3.1] - 2026-06-28
 
 Patch release: the NIST Rev 5 default flip, a workspace-wide UTC timestamp
