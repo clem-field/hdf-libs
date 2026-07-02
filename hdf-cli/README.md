@@ -14,6 +14,12 @@ HDF (Heimdall Data Format) is a standardized JSON format for security assessment
   - [query](#query) -- Search and filter requirements
   - [diff](#diff) -- Compare two HDF documents
   - [convert](#convert) -- Convert between formats
+  - [system](#system) -- View and manage HDF system documents
+  - [plan](#plan) -- View and manage HDF assessment plans
+  - [amend](#amend) -- Apply, list, and verify amendments (waivers/attestations)
+  - [evidence](#evidence) -- Build and inspect evidence packages
+  - [label](#label) -- Add, remove, or show labels on components
+  - [generate](#generate) -- Generate InSpec profiles, thresholds, and baseline upgrades
   - [fetch](#fetch) -- Fetch from live APIs
     - [fetch aws-config](#fetch-aws-config) -- AWS Config compliance data
     - [fetch gitlab](#fetch-gitlab) -- GitLab CI/CD security artifacts
@@ -294,6 +300,215 @@ $ hdf validate results.json
 On auto-detection the source format and a confidence score are reported; with an explicit `--from` the conversion runs silently and writes to `-o` (or stdout).
 
 See [Supported Conversions](#supported-conversions) for the full list.
+
+### system
+
+View and manage HDF **system** documents — a system's authorization boundary, components, baselines, and interconnections.
+
+```
+USAGE
+  hdf system <subcommand> <file> [flags]
+
+SUBCOMMANDS
+  create            Bootstrap a system document from a results file or SBOM
+  info              Summarize a system document
+  add-component     Add a component from an SBOM
+  update-component  Update a component's SBOM reference
+  set               Set/unset top-level fields
+
+EXAMPLES
+  hdf system create --from results.json --name "Portal Prod" -o portal.hdf-system.json
+  hdf system info portal.hdf-system.json
+  hdf system info portal.hdf-system.json --json
+```
+
+Example output:
+
+```console
+$ hdf system info portal-prod.hdf-system.json
+System: Portal Prod
+System ID: aaaaaaaa-1111-2222-3333-444444444444
+
+Components (2):
+  WebTier (application)
+    Baselines: RHEL9-STIG
+  DatabaseTier (application)
+    Baselines: PostgreSQL-STIG
+```
+
+### plan
+
+View and manage HDF **assessment plan** documents — which baselines run against which targets, with resolved inputs and scheduling.
+
+```
+USAGE
+  hdf plan <subcommand> <file> [flags]
+
+SUBCOMMANDS
+  create   Create an assessment plan
+  info     Summarize a plan document
+  set      Set/unset top-level fields
+
+EXAMPLES
+  hdf plan info quarterly-plan.hdf-plan.json
+  hdf plan info quarterly-plan.hdf-plan.json --json
+```
+
+Example output:
+
+```console
+$ hdf plan info quarterly-plan.hdf-plan.json
+Plan: portal-prod-assessment-plan
+ID: 4737569f-8bb5-49b1-8e3a-3586a88d092e
+Type: automated
+System: system.json
+
+Assessments (2):
+  1. Baseline: RHEL9-STIG
+  2. Baseline: PostgreSQL-STIG
+```
+
+### amend
+
+Apply, list, and verify HDF **amendments** — standalone waiver / attestation / POA&M documents that modify requirement compliance status in results.
+
+```
+USAGE
+  hdf amend <subcommand> [flags]
+
+SUBCOMMANDS
+  apply    Merge amendments into a results file (sets effectiveStatus)
+  create   Create waivers, attestations, and other amendments
+  draft    Scaffold an incomplete amendments draft from a results file
+  list     List amendments in an amendments file
+  verify   Verify amendment validity, expiration, and chain integrity
+  set      Set/unset top-level fields
+
+EXAMPLES
+  hdf amend apply --results results.json --amendments waivers.json -o merged.json
+  hdf amend list waivers.json
+  hdf amend verify waivers.json                     # expiration check
+  hdf amend verify waivers.json results.json         # full chain verification
+```
+
+Example output:
+
+```console
+$ hdf amend list waivers.json
+Amendments: Q1 Waivers
+System: portal-prod.hdf-system.json
+
+Amendments (1):
+Requirement  Type    Status  Impact  Expires     Reason
+-----------  ------  ------  ------  ----------  ---------------------
+AC-1         waiver  passed          2099-12-31  Risk accepted per ATO
+
+$ hdf amend verify waivers.json
+Total amendments: 1
+Valid:            1
+Expired:         0
+
+All amendments are valid.
+```
+
+### evidence
+
+Build and inspect HDF **evidence packages** — bundles of references to all HDF documents for audit, authorization, and compliance review.
+
+```
+USAGE
+  hdf evidence <subcommand> <file> [flags]
+
+SUBCOMMANDS
+  build    Bundle HDF documents into an evidence package
+  info     Summarize an evidence package (with per-document checksum status)
+  verify   Verify an evidence package against its assessment plan
+  export   Export package documents to another format
+  set      Set/unset top-level fields
+
+EXAMPLES
+  hdf evidence build --system system.json --results r1.json --results r2.json -o q1.hdf-evidence-package.json
+  hdf evidence info q1.hdf-evidence-package.json
+  hdf evidence verify q1.hdf-evidence-package.json
+```
+
+Example output:
+
+```console
+$ hdf evidence info q1-2026.hdf-evidence-package.json
+Evidence Package: Portal Prod Q1 Evidence
+System: system.json
+
+Contents (4):
+  hdf-system       system.json  ✓ checksum
+  hdf-plan         plan.json  ✓ checksum
+  hdf-results      rhel9-results.json  ✓ checksum
+  hdf-results      postgres-results.json  ✓ checksum
+```
+
+### label
+
+Add, remove, or show key=value labels on the components of an HDF document.
+
+```
+USAGE
+  hdf label <subcommand> <file> [flags]
+
+SUBCOMMANDS
+  show     Display labels on all components
+  set      Set labels on all components
+  remove   Remove labels from all components
+
+EXAMPLES
+  hdf label show results.json
+  hdf label set results.json system=Portal environment=production -o labeled.json
+  hdf label remove results.json system environment -o cleaned.json
+```
+
+Example output:
+
+```console
+$ hdf label set results.json system=Portal environment=production -o labeled.json
+Labels written to labeled.json
+
+$ hdf label show labeled.json
+Component: web01.example.com [host]
+  environment = production
+  system = Portal
+```
+
+### generate
+
+Generate security templates and skeletons from HDF baselines, results, or XCCDF benchmarks.
+
+```
+USAGE
+  hdf generate <subcommand> <file> [flags]
+
+SUBCOMMANDS
+  inspec-profile   Generate an InSpec profile from an HDF Baseline or XCCDF Benchmark
+  threshold        Generate a compliance threshold template from HDF results
+  upgrade          Upgrade a baseline with new upstream metadata, preserving customizations (alias: delta)
+
+EXAMPLES
+  hdf generate inspec-profile baseline.json my-profile/           # <input> <output-dir>
+  hdf generate inspec-profile U_RHEL_9_STIG_xccdf.xml rhel9-stig/  # XCCDF auto-detected
+  hdf generate threshold results.json -o threshold.yml
+  hdf generate upgrade profile/ new-stig-xccdf.xml               # <current> <upstream>
+```
+
+Example output:
+
+```console
+$ hdf generate threshold results.json
+compliance:
+    min: 100
+passed:
+    high:
+        min: 1
+    total:
+        min: 1
+```
 
 ### fetch
 
