@@ -10,10 +10,9 @@ HDF (Heimdall Data Format) is a standardized JSON format for security assessment
 - [Terminology](#terminology)
 - [Commands](#commands)
   - [validate](#validate) -- Validate an HDF file against the schema
-  - [info](#info) -- Display summary information
-  - [stats](#stats) -- Display assessment statistics
-  - [list](#list) -- List controls, profiles, or targets
-  - [query](#query) -- Search and filter controls
+  - [list](#list) -- Summarize a document, or list items with `--detail`
+  - [query](#query) -- Search and filter requirements
+  - [diff](#diff) -- Compare two HDF documents
   - [convert](#convert) -- Convert between formats
   - [fetch](#fetch) -- Fetch from live APIs
     - [fetch aws-config](#fetch-aws-config) -- AWS Config compliance data
@@ -101,54 +100,61 @@ EXAMPLES
   curl -s https://example.com/scan.json | hdf validate
 ```
 
-### info
+Example output:
 
-Display summary information about an HDF results file: generator tool/version, platform, profile names, target info, and assessment timestamp.
+```console
+$ hdf validate results.json
+✓ results.json is a valid HDF results file
 
-```
-USAGE
-  hdf info <file> [flags]
-
-EXAMPLES
-  hdf info results.json
-  hdf info results.json --json
-```
-
-### stats
-
-Display pass/fail/error/not-reviewed/not-applicable statistics from an HDF results file.
-
-```
-USAGE
-  hdf stats <file> [flags]
-
-EXAMPLES
-  hdf stats results.json
-  hdf stats results.json --json
+$ echo '{"not":"hdf"}' | hdf validate -
+✗ <stdin> — input not recognized as any HDF document type
+  Use --type to specify: results, baseline, comparison, system, plan, amendments, evidence-package
 ```
 
 ### list
 
-List controls, profiles, or targets from an HDF results file.
+Summarize any HDF document, or expand a section to item-level detail with `--detail`. The default summary reports document counts and, for results, the status breakdown — this replaces the former `info` and `stats` commands.
 
 ```
 USAGE
-  hdf list <what> <file> [flags]
+  hdf list <file> [file...] [--detail <section>] [flags]
 
-LIST TYPES
-  controls (aliases: control, c)
-  profiles (aliases: profile, p)
-  targets  (aliases: target, t)
+DETAIL SECTIONS (aliases)
+  requirements (r)   baselines (b)   components (t)   overrides
 
 FLAGS
-  -s, --status string    Filter by status: passed, failed, error, not_applicable, not_reviewed
-  -a, --all              Show all details
+  -s, --status string    Filter requirements by status: passed, failed, error, not_applicable, not_reviewed
 
 EXAMPLES
-  hdf list controls results.json
-  hdf list controls results.json --status failed
-  hdf list profiles results.json
-  hdf list targets results.json --json
+  hdf list results.json                              # summary (counts + status breakdown)
+  hdf list results.json --detail requirements        # list individual requirements
+  hdf list results.json --detail requirements -s failed
+  hdf list system.json --detail components           # list system components
+  hdf list amendments.json --detail overrides        # list waivers/attestations
+  hdf list results.json --json
+```
+
+Example output:
+
+```console
+$ hdf list results.json
+Baselines:    5
+Requirements: 1603
+Components:   0
+
+  ✓ passed          134
+  ✗ failed          273
+  ? not_reviewed    1196
+
+$ hdf list results.json --detail requirements -s failed
+Requirements: 273
+
+ID         Status  Title
+---------  ------  ------------------------------------------------------------
+SV-257777  failed  RHEL 9 must be a vendor-supported release.
+V-242387   failed  The Kubernetes Kubelet must have the read-only port flag ...
+V-242391   failed  The Kubernetes Kubelet must have anonymous authentication...
+V-242392   failed  The Kubernetes kubelet must enable explicit authorization.
 ```
 
 ### query
@@ -185,6 +191,62 @@ EXAMPLES
   hdf query results.json --limit 20 --status failed
 ```
 
+Example output:
+
+```console
+$ hdf query results.json --status failed --limit 5
+Found 5 matching requirement(s):
+
+ID         Status  Severity  Title
+---------  ------  --------  -------------------------------------------------------
+SV-257777  failed  INFO      RHEL 9 must be a vendor-supported release.
+V-242387   failed  HIGH      The Kubernetes Kubelet must have the read-only port ...
+V-242391   failed  HIGH      The Kubernetes Kubelet must have anonymous authentic...
+V-242392   failed  HIGH      The Kubernetes kubelet must enable explicit authoriz...
+
+$ hdf query results.json --status failed --count
+273
+```
+
+### diff
+
+Compare two HDF documents and classify each requirement as fixed, regressed, unchanged, updated, new, or absent. Results documents are compared temporally; system documents by component drift. Document type is auto-detected.
+
+```
+USAGE
+  hdf diff <old-file> <new-file> [flags]
+
+FLAGS
+  -f, --format string      Output format: table, json, markdown (default "table")
+      --stat               Summary counts only (like git diff --stat)
+      --regressed          Show only regressions (also --fixed, --new, --absent)
+      --exit-code          POSIX diff exit codes: 0=identical, 1=differences, 2=error
+      --detailed-exitcode  Nuanced codes: 10=fixes, 11=regressions, 12=mixed, 13=baseline, 14=drift
+      --system string      System document for component-aware comparison
+      --sbom               Treat inputs as CycloneDX/SPDX SBOM documents
+
+EXAMPLES
+  hdf diff old-scan.json new-scan.json
+  hdf diff old-scan.json new-scan.json -f markdown
+  hdf diff old-scan.json new-scan.json --regressed
+  hdf diff old-scan.json new-scan.json --detailed-exitcode   # exit code encodes outcome
+  hdf diff --sbom old.cdx.json new.cdx.json
+```
+
+Example output:
+
+```console
+$ hdf diff old-scan.json new-scan.json
+HDF Comparison: old-scan.json → new-scan.json
+
+ID       Title                          Old Status  New Status  State
+-------  -----------------------------  ----------  ----------  ---------
+REQ-001  Test Requirement               passed      failed      regressed
+REQ-002  Audit logging must be enabled  -           passed      new
+
+Summary: 0 fixed, 1 regressed, 1 new, 0 absent, 0 unchanged, 0 updated (2 total)
+```
+
 ### convert
 
 Convert security assessment data between HDF and other formats. Supports auto-detection, explicit `--from`/`--to` flags, stdin, and stdout.
@@ -218,6 +280,18 @@ EXAMPLES
   hdf convert --from hdf --to xml results.json -o controls.xml
   cat scan.json | hdf convert --from sarif - -o output.json
 ```
+
+Example output:
+
+```console
+$ hdf convert compliance.nessus -o results.json
+Detected: Nessus 2 (confidence: 100%)
+
+$ hdf validate results.json
+✓ results.json is a valid HDF results file
+```
+
+On auto-detection the source format and a confidence score are reported; with an explicit `--from` the conversion runs silently and writes to `-o` (or stdout).
 
 See [Supported Conversions](#supported-conversions) for the full list.
 
