@@ -4,6 +4,7 @@ import {
   DEFAULT_STATIC_ANALYSIS_NIST_TAGS,
 } from '@mitre/hdf-mappings';
 import { deriveControlTypeFromTags, inputChecksum, limitArray, mapCWEToNIST, validateInputSize, buildHdfResults } from '../../../shared/typescript/converterutil.js';
+import { parseBom, buildBom, BOMType, type BuildBomParts } from '../../../shared/typescript/bom/index.js';
 import type {
   EvaluatedBaseline,
   EvaluatedRequirement,
@@ -177,6 +178,16 @@ function flattenComponents(components: CycloneDXComponent[]): CycloneDXComponent
 }
 
 /**
+ * Reports whether any (possibly nested) component is a machine-learning-model,
+ * i.e. the CycloneDX document is an AI-BOM.
+ */
+function hasMLModelComponent(components: CycloneDXComponent[]): boolean {
+  return flattenComponents(components).some(
+    (comp) => comp.type === 'machine-learning-model'
+  );
+}
+
+/**
  * Converts CycloneDX SBOM/VEX JSON to HDF format.
  *
  * @param input - CycloneDX JSON string
@@ -210,10 +221,17 @@ export async function convertCyclonedxToHdf(input: string): Promise<string> {
   }
 
   if (!bom.vulnerabilities || bom.vulnerabilities.length === 0) {
+    if (hasMLModelComponent(bom.components ?? [])) {
+      throw new Error(
+        'cyclonedx: this file is a CycloneDX AI-BOM (machine-learning-model inventory) with no vulnerabilities; ' +
+        'to import it into a system document, use:\n' +
+        '  hdf system create <file> --from cyclonedx-mlbom'
+      );
+    }
     throw new Error(
       'cyclonedx: this file is an SBOM inventory with no vulnerabilities; ' +
       'to import SBOM data into a system document, use:\n' +
-      '  hdf system create --from <sbom-file> --component-name <name>'
+      '  hdf system create <sbom-file> --component-name <name>'
     );
   }
 
@@ -336,13 +354,29 @@ export async function convertCyclonedxToHdf(input: string): Promise<string> {
 
   const targetName = bom.metadata?.component?.name ?? '';
 
+  // Attach the CycloneDX BOM to the component as a generalized boms[] entry.
+  // The shared BOM parser yields the normalized package inventory; the raw
+  // manifest is also carried via document passthrough so no data is dropped.
+  // Vuln-only inputs (no components) have no packages and carry the document only.
+  const parsedBom = parseBom(input);
+  const bomParts: BuildBomParts = {
+    bomType: BOMType.Sbom,
+    format: 'cyclonedx',
+    uniqueId: parsedBom.normalized.uniqueId,
+    document: JSON.parse(input) as Record<string, unknown>,
+  };
+  if (parsedBom.normalized.packages && parsedBom.normalized.packages.length > 0) {
+    bomParts.packages = parsedBom.normalized.packages;
+  }
+  const componentBom = buildBom(bomParts);
+
   return buildHdfResults({
     generatorName: 'cyclonedx-to-hdf',
     converterVersion: '1.0.0',
     toolName: 'CycloneDX',
     toolFormat: 'JSON',
     baselines: [baseline],
-    components: [{ name: targetName, type: TargetType.Application }],
+    components: [{ name: targetName, type: TargetType.Application, boms: [componentBom] }],
     timestamp: scanTime,
   });
 }

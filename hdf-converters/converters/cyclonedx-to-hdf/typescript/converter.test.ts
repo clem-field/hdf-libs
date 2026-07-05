@@ -305,6 +305,29 @@ describe('cyclonedx to HDF converter', async () => {
         convertCyclonedxToHdf(loadFixture('spdx-to-cyclonedx.json'))
       ).rejects.toThrow('SBOM inventory with no vulnerabilities');
     });
+
+    it('should reject SBOM-only input with the positional system-create syntax', async () => {
+      await expect(
+        convertCyclonedxToHdf(loadFixture('spdx-to-cyclonedx.json'))
+      ).rejects.toThrow('hdf system create <sbom-file> --component-name <name>');
+    });
+
+    it('should reject a no-vuln AI-BOM with an AI-BOM-specific message', async () => {
+      const input = JSON.stringify({
+        bomFormat: 'CycloneDX',
+        specVersion: '1.6',
+        components: [
+          {
+            type: 'machine-learning-model',
+            name: 'stable-diffusion',
+            'bom-ref': 'model-a',
+          },
+        ],
+      });
+      await expect(convertCyclonedxToHdf(input)).rejects.toThrow(
+        'hdf system create <file> --from cyclonedx-mlbom'
+      );
+    });
   });
 
   describe('VEX format', async () => {
@@ -347,6 +370,34 @@ describe('cyclonedx to HDF converter', async () => {
       expect(defaultDesc).toBeDefined();
       expect(defaultDesc!.data).toContain('jackson-databind');
       expect(defaultDesc!.data).toContain('XXE Injection');
+    });
+  });
+
+  describe('component boms[] attachment', async () => {
+    it('should attach an sbom boms[] entry with normalized packages and document passthrough', async () => {
+      // minimal-vulns.json has 2 components
+      const hdf = JSON.parse(
+        await convertCyclonedxToHdf(loadFixture('minimal-vulns.json'))
+      ) as HDFResults;
+      const boms = hdf.components?.[0]?.boms;
+      expect(boms).toHaveLength(1);
+      expect(boms![0]!.bomType).toBe('sbom');
+      expect(boms![0]!.format).toBe('cyclonedx');
+      expect(boms![0]!.packages?.length).toBeGreaterThan(0);
+      expect(boms![0]!.document).toBeDefined();
+    });
+
+    it('should carry document only (no packages) for vuln-only input', async () => {
+      // vex.json has no components
+      const hdf = JSON.parse(
+        await convertCyclonedxToHdf(loadFixture('vex.json'))
+      ) as HDFResults;
+      const boms = hdf.components?.[0]?.boms;
+      expect(boms).toHaveLength(1);
+      expect(boms![0]!.bomType).toBe('sbom');
+      expect(boms![0]!.format).toBe('cyclonedx');
+      expect(boms![0]!.packages ?? []).toHaveLength(0);
+      expect(boms![0]!.document).toBeDefined();
     });
   });
 

@@ -5,6 +5,7 @@ import commonSchema from '../src/schemas/primitives/common.schema.json';
 import systemSchema from '../src/schemas/primitives/system.schema.json';
 import targetSchema from '../src/schemas/primitives/target.schema.json';
 import componentSchema from '../src/schemas/primitives/component.schema.json';
+import bomSchema from '../src/schemas/primitives/bom.schema.json';
 import { schemaRef } from './schema-ref';
 
 describe('component.schema.json', () => {
@@ -14,6 +15,7 @@ describe('component.schema.json', () => {
   ajv.addSchema(commonSchema);
   ajv.addSchema(systemSchema);
   ajv.addSchema(targetSchema);
+  ajv.addSchema(bomSchema);
   ajv.addSchema(componentSchema);
 
   // ── Base_Component ──
@@ -150,139 +152,259 @@ describe('component.schema.json', () => {
     });
   });
 
-  // ── SBOM embedding ──
+  // ── BOM attachment (boms[]) — generalized, replaces the SBOM trio ──
 
-  describe('SBOM embedding', () => {
+  describe('BOM attachment (boms[])', () => {
     const validate = ajv.compile({
       ...schemaRef(componentSchema, 'Base_Component'),
     });
 
-    it('should validate a component with CycloneDX SBOM', () => {
+    it('should validate a component with a passthrough SBOM by reference', () => {
       const valid = {
         name: 'WebTier',
         type: 'application',
-        sbomFormat: 'cyclonedx',
-        sbom: {
-          bomFormat: 'CycloneDX',
-          specVersion: '1.5',
-          version: 1,
-          components: [
-            { type: 'library', name: 'express', version: '4.18.2' },
-          ],
-        },
+        boms: [
+          {
+            bomType: 'sbom',
+            format: 'cyclonedx',
+            ref: 'https://artifacts.agency.gov/sbom/webtier.cdx.json',
+          },
+        ],
       };
       expect(validate(valid)).toBe(true);
     });
 
-    it('should validate a component with SPDX SBOM', () => {
+    it('should validate a component with an embedded (document) passthrough SBOM', () => {
       const valid = {
         name: 'WebTier',
         type: 'application',
-        sbomFormat: 'spdx',
-        sbom: {
-          spdxVersion: 'SPDX-2.3',
-          SPDXID: 'SPDXRef-DOCUMENT',
-          name: 'WebTier-SBOM',
-          dataLicense: 'CC0-1.0',
-        },
+        boms: [
+          {
+            bomType: 'sbom',
+            format: 'cyclonedx',
+            document: { bomFormat: 'CycloneDX', specVersion: '1.5' },
+          },
+        ],
       };
       expect(validate(valid)).toBe(true);
     });
 
-    it('should reject CycloneDX SBOM missing bomFormat', () => {
-      const invalid = {
-        name: 'WebTier',
-        type: 'application',
-        sbomFormat: 'cyclonedx',
-        sbom: {
-          specVersion: '1.5',
-          // missing bomFormat
-        },
-      };
-      expect(validate(invalid)).toBe(false);
-    });
-
-    it('should reject CycloneDX SBOM missing specVersion', () => {
-      const invalid = {
-        name: 'WebTier',
-        type: 'application',
-        sbomFormat: 'cyclonedx',
-        sbom: {
-          bomFormat: 'CycloneDX',
-          // missing specVersion
-        },
-      };
-      expect(validate(invalid)).toBe(false);
-    });
-
-    it('should reject CycloneDX SBOM with wrong bomFormat value', () => {
-      const invalid = {
-        name: 'WebTier',
-        type: 'application',
-        sbomFormat: 'cyclonedx',
-        sbom: {
-          bomFormat: 'NotCycloneDX',
-          specVersion: '1.5',
-        },
-      };
-      expect(validate(invalid)).toBe(false);
-    });
-
-    it('should reject SPDX SBOM missing spdxVersion', () => {
-      const invalid = {
-        name: 'WebTier',
-        type: 'application',
-        sbomFormat: 'spdx',
-        sbom: {
-          SPDXID: 'SPDXRef-DOCUMENT',
-          // missing spdxVersion
-        },
-      };
-      expect(validate(invalid)).toBe(false);
-    });
-
-    it('should reject SPDX SBOM missing SPDXID', () => {
-      const invalid = {
-        name: 'WebTier',
-        type: 'application',
-        sbomFormat: 'spdx',
-        sbom: {
-          spdxVersion: 'SPDX-2.3',
-          // missing SPDXID
-        },
-      };
-      expect(validate(invalid)).toBe(false);
-    });
-
-    it('should reject sbomFormat without sbom', () => {
-      // sbomFormat without sbom or sbomRef is meaningless but not invalid at base level
-      // However, if sbom is provided, sbomFormat must match — tested above
-      // This test validates that sbom is checked when sbomFormat is present
-      const withRefOnly = {
-        name: 'WebTier',
-        type: 'application',
-        sbomRef: 'https://artifacts.agency.gov/sbom/webtier.cdx.json',
-        sbomFormat: 'cyclonedx',
-      };
-      // sbomRef + sbomFormat without embedded sbom is valid (external reference only)
-      expect(validate(withRefOnly)).toBe(true);
-    });
-
-    it('should validate sbomRef as uri-reference', () => {
+    it('should validate a component carrying multiple BOMs (sbom + ai-model)', () => {
       const valid = {
-        name: 'WebTier',
+        name: 'InferenceService',
         type: 'application',
-        sbomRef: './sboms/webtier.cdx.json',
-        sbomFormat: 'cyclonedx',
+        boms: [
+          { bomType: 'sbom', format: 'spdx', ref: './sboms/svc.spdx.json' },
+          {
+            bomType: 'ai-model',
+            format: 'cyclonedx-ml',
+            model: { parameterCount: 6738415616, adaptationType: 'finetune' },
+          },
+        ],
       };
       expect(validate(valid)).toBe(true);
     });
 
-    it('should reject invalid sbomFormat value', () => {
+    it('should validate passthrough for every reserved bomType', () => {
+      const reserved = ['sbom', 'ai-model', 'dataset', 'hbom', 'cbom', 'saasbom', 'obom', 'mbom', 'kbom'];
+      for (const bomType of reserved) {
+        const valid = {
+          name: 'C',
+          type: 'application',
+          boms: [{ bomType, format: 'cyclonedx', ref: './x.json' }],
+        };
+        expect(validate(valid), `passthrough should validate for ${bomType}`).toBe(true);
+      }
+    });
+
+    it('should reject a BOM missing bomType', () => {
       const invalid = {
         name: 'WebTier',
         type: 'application',
-        sbomFormat: 'unknown-format',
+        boms: [{ format: 'cyclonedx', ref: './x.json' }],
+      };
+      expect(validate(invalid)).toBe(false);
+    });
+
+    it('should reject a BOM missing format', () => {
+      const invalid = {
+        name: 'WebTier',
+        type: 'application',
+        boms: [{ bomType: 'sbom', ref: './x.json' }],
+      };
+      expect(validate(invalid)).toBe(false);
+    });
+
+    it('should reject an unknown bomType value', () => {
+      const invalid = {
+        name: 'WebTier',
+        type: 'application',
+        boms: [{ bomType: 'vex', format: 'cyclonedx', ref: './x.json' }],
+      };
+      expect(validate(invalid)).toBe(false);
+    });
+
+    it('should reject a BOM with an unknown property (strict base)', () => {
+      const invalid = {
+        name: 'WebTier',
+        type: 'application',
+        boms: [{ bomType: 'sbom', format: 'cyclonedx', sbomFormat: 'cyclonedx' }],
+      };
+      expect(validate(invalid)).toBe(false);
+    });
+
+    it('should reject an invalid adaptationType enum value', () => {
+      const invalid = {
+        name: 'M',
+        type: 'application',
+        boms: [
+          { bomType: 'ai-model', format: 'cyclonedx-ml', model: { adaptationType: 'distilled' } },
+        ],
+      };
+      expect(validate(invalid)).toBe(false);
+    });
+
+    it('should reject the ai-model extension on a non-ai-model BOM (three-tier discipline)', () => {
+      const invalid = {
+        name: 'WebTier',
+        type: 'application',
+        boms: [{ bomType: 'sbom', format: 'cyclonedx', model: { parameterCount: 100 } }],
+      };
+      expect(validate(invalid)).toBe(false);
+    });
+
+    it('should reject the normalized packages extension on a non-sbom BOM', () => {
+      const invalid = {
+        name: 'M',
+        type: 'application',
+        boms: [
+          { bomType: 'ai-model', format: 'cyclonedx-ml', packages: [{ name: 'express' }] },
+        ],
+      };
+      expect(validate(invalid)).toBe(false);
+    });
+
+    it('should validate a normalized dataset BOM', () => {
+      const valid = {
+        name: 'TrainingCorpus',
+        type: 'application',
+        boms: [
+          {
+            bomType: 'dataset',
+            format: 'croissant',
+            dataset: { recordCount: 2500000, datasetFormat: 'parquet' },
+          },
+        ],
+      };
+      expect(validate(valid)).toBe(true);
+    });
+
+    it('should validate a dataset BOM with lineage (baseDatasetRefs + derivation)', () => {
+      const valid = {
+        name: 'TrainingCorpus',
+        type: 'application',
+        boms: [
+          {
+            bomType: 'dataset',
+            format: 'croissant',
+            dataset: {
+              recordCount: 1000000,
+              baseDatasetRefs: ['b7c8d9e0-1a2b-4c3d-8e4f-5a6b7c8d9e0f'],
+              derivation: 'filtered',
+            },
+          },
+        ],
+      };
+      expect(validate(valid)).toBe(true);
+    });
+
+    it('should reject an invalid dataset derivation enum value', () => {
+      const invalid = {
+        name: 'TrainingCorpus',
+        type: 'application',
+        boms: [
+          { bomType: 'dataset', format: 'croissant', dataset: { derivation: 'synthesized' } },
+        ],
+      };
+      expect(validate(invalid)).toBe(false);
+    });
+
+    it('should reject dataset lineage carried on a non-dataset BOM (three-tier)', () => {
+      const invalid = {
+        name: 'M',
+        type: 'application',
+        boms: [
+          { bomType: 'ai-model', format: 'cyclonedx-ml', dataset: { derivation: 'filtered' } },
+        ],
+      };
+      expect(validate(invalid)).toBe(false);
+    });
+  });
+
+  // ── Artifact integrity (Base_Component.integrity) ──
+
+  describe('Artifact integrity (Base_Component.integrity)', () => {
+    const validate = ajv.compile({
+      ...schemaRef(componentSchema, 'Base_Component'),
+    });
+
+    it('should validate a component with an integrity checksum array', () => {
+      const valid = {
+        name: 'Llama-2-7b weights',
+        type: 'aiModel',
+        integrity: [
+          { algorithm: 'sha256', value: 'e3b0c44298fc1c149afbf4c8996fb92427ae41e4649b934ca495991b7852b855' },
+        ],
+      };
+      expect(validate(valid)).toBe(true);
+    });
+
+    it('should validate multi-file (sharded) artifact integrity', () => {
+      const valid = {
+        name: 'sharded-model',
+        type: 'aiModel',
+        integrity: [
+          { algorithm: 'sha256', value: 'aa11bb22cc33dd44ee55ff66aa11bb22cc33dd44ee55ff66aa11bb22cc33dd44' },
+          { algorithm: 'sha512', value: 'cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e' },
+        ],
+      };
+      expect(validate(valid)).toBe(true);
+    });
+
+    it('should validate dataset artifact integrity via the same shared field', () => {
+      const valid = {
+        name: 'training-corpus',
+        type: 'dataset',
+        integrity: [
+          { algorithm: 'sha512', value: 'cf83e1357eefb8bdf1542850d66d8007d620e4050b5715dc83f4a921d36ce9ce47d0d13c5d85f2b0ff8318d2877eec2f63b931bd47417a81a538327af927da3e' },
+        ],
+      };
+      expect(validate(valid)).toBe(true);
+    });
+
+    it('should accept blake3 as a hash algorithm (absorbed container-image digests)', () => {
+      const valid = {
+        name: 'nginx',
+        type: 'containerImage',
+        integrity: [{ algorithm: 'blake3', value: 'a9286defaba7b3a519d585ba0e37d0b2cbee74ebfe590960b0b1d6a5e97d1e1d' }],
+      };
+      expect(validate(valid)).toBe(true);
+    });
+
+    it('should reject an integrity entry with an unknown hash algorithm', () => {
+      const invalid = {
+        name: 'M',
+        type: 'aiModel',
+        integrity: [{ algorithm: 'md5', value: 'd41d8cd98f00b204e9800998ecf8427e' }],
+      };
+      expect(validate(invalid)).toBe(false);
+    });
+
+    it('should reject an integrity entry missing the value', () => {
+      const invalid = {
+        name: 'M',
+        type: 'aiModel',
+        integrity: [{ algorithm: 'sha256' }],
       };
       expect(validate(invalid)).toBe(false);
     });
@@ -316,7 +438,7 @@ describe('component.schema.json', () => {
         registry: 'docker.io',
         repository: 'library/nginx',
         tag: '1.25-alpine',
-        digest: 'sha256:a9286defaba7b3a519d585ba0e37d0b2cbee74ebfe590960b0b1d6a5e97d1e1d',
+        integrity: [{ algorithm: 'sha256', value: 'a9286defaba7b3a519d585ba0e37d0b2cbee74ebfe590960b0b1d6a5e97d1e1d' }],
       };
       expect(validate(valid)).toBe(true);
     });
@@ -436,8 +558,49 @@ describe('component.schema.json', () => {
         labels: { environment: 'production' },
         description: 'Primary web application server',
         baselineRefs: ['RHEL9-STIG'],
-        sbomRef: 'https://artifacts.agency.gov/sbom/web01.cdx.json',
-        sbomFormat: 'cyclonedx',
+        boms: [{ bomType: 'sbom', format: 'cyclonedx', ref: 'https://artifacts.agency.gov/sbom/web01.cdx.json' }],
+      };
+      expect(validate(valid)).toBe(true);
+    });
+
+    it('should validate an AI_Model_Component', () => {
+      const valid = {
+        type: 'aiModel',
+        name: 'Llama-2-7b-chat (finetuned)',
+        componentId: 'b7c8d9e0-1a2b-4c3d-8e4f-5a6b7c8d9e0f',
+        modelId: 'acme/llama-2-7b-chat-support',
+        version: '1.2.0',
+        boms: [
+          {
+            bomType: 'ai-model',
+            format: 'cyclonedx-ml',
+            model: { parameterCount: 6738415616, serializationFormat: 'safetensors', adaptationType: 'finetune' },
+          },
+        ],
+      };
+      expect(validate(valid)).toBe(true);
+    });
+
+    it('should validate a Dataset_Component', () => {
+      const valid = {
+        type: 'dataset',
+        name: 'UltraChat-200k (filtered)',
+        componentId: 'c1d2e3f4-a5b6-4c7d-8e9f-0a1b2c3d4e5f',
+        datasetId: 'acme/ultrachat-200k-filtered',
+        version: '2026-06-01',
+        boms: [
+          {
+            bomType: 'dataset',
+            format: 'croissant',
+            dataset: {
+              recordCount: 180000,
+              datasetFormat: 'parquet',
+              dataClassification: 'public',
+              baseDatasetRefs: ['HuggingFaceH4/ultrachat_200k'],
+              derivation: 'filtered',
+            },
+          },
+        ],
       };
       expect(validate(valid)).toBe(true);
     });

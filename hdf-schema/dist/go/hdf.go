@@ -858,9 +858,11 @@ type SupportedPlatform struct {
 // A physical or virtual server, workstation, or network device.
 //
 // Base properties shared by all component types. Extends the Target concept with stable
-// identity, external references, and SBOM embedding.
+// identity, external references, generalized BOM attachment (boms[]), and unified artifact
+// integrity (integrity[]).
 //
-// A static container image (not running).
+// A static container image (not running). Image integrity — formerly the 'digest' field —
+// is expressed via the shared Base_Component.integrity array.
 //
 // A running container instance.
 //
@@ -874,14 +876,28 @@ type SupportedPlatform struct {
 //
 // A running application or API (for DAST tools).
 //
-// A software artifact or dependency (for SCA tools).
+// A software artifact or dependency (for SCA tools). Package integrity — formerly the
+// 'checksum' field — is expressed via the shared Base_Component.integrity array.
 //
 // A network segment or network device.
 //
 // A database instance.
+//
+// A thin AI-model component: identity and correlation only (parallel to Host_Component's
+// fqdn/ip). All model detail — architecture, parameter count, serialization format, lineage
+// — lives in an attached ai-model BOM (boms[]), never on the component itself.
+//
+// A thin dataset component: identity and correlation only, symmetric with
+// AI_Model_Component. All dataset detail — record count, format, classification, lineage —
+// lives in an attached dataset BOM (boms[]), never on the component itself.
 type Component struct {
 	// Names of baselines that apply to this component.                                                           
 	BaselineRefs                                                                                []string          `json:"baselineRefs,omitempty"`
+	// Component-scoped Bills of Materials (SBOM, ai-model, dataset, or any reserved bomType),                    
+	// each carried by passthrough (ref/document) or normalized. Replaces the former                              
+	// sbom/sbomRef/sbomFormat trio; a component may carry several BOMs (e.g. an SBOM plus an                     
+	// ai-model BOM). See primitives/bom.schema.json.                                                             
+	Boms                                                                                        []BillOfMaterials `json:"boms,omitempty"`
 	// Stable UUID (RFC 4122) for this component. Required in hdf-system documents, optional in                   
 	// hdf-results. Enables cross-document correlation, diffing, and data flow references.                        
 	ComponentID                                                                                 *string           `json:"componentId,omitempty"`
@@ -893,6 +909,13 @@ type Component struct {
 	ExternalIDS                                                                                 map[string]string `json:"externalIds,omitempty"`
 	// System-specific overrides for baseline input values.                                                       
 	InputOverrides                                                                              []InputOverride   `json:"inputOverrides,omitempty"`
+	// Cryptographic integrity of this component's underlying artifact — model weights or                         
+	// shards, dataset archive, container image, or package bytes. An array supports                              
+	// multi-file/sharded artifacts. This is the single, generic home for artifact/subject                        
+	// integrity across all component types (it replaced the former per-type Container_Image                      
+	// digest and Artifact checksum fields). Distinct from BOM-document integrity (Bom.hashes[])                  
+	// and from the document tamper-evidence Integrity type.                                                      
+	Integrity                                                                                   []Checksum        `json:"integrity,omitempty"`
 	// Optional key-value labels for flexible grouping. Well-known keys: system, component,                       
 	// environment, region, team. Values must be strings.                                                         
 	Labels                                                                                      map[string]string `json:"labels,omitempty"`
@@ -901,18 +924,11 @@ type Component struct {
 	// Team or individual responsible for this component. Enables per-component ownership when                    
 	// different teams manage different parts of a system.                                                        
 	Owner                                                                                       *Identity         `json:"owner,omitempty"`
-	// Embedded CycloneDX or SPDX SBOM document representing this component's software                            
-	// inventory. The sbomFormat field determines which format constraints apply.                                 
-	Sbom                                                                                        interface{}       `json:"sbom,omitempty"`
-	// Format of the SBOM (embedded or referenced). Required when sbom or sbomRef is present.                     
-	SbomFormat                                                                                  *SBOMFormat       `json:"sbomFormat,omitempty"`
-	// URI reference to an external CycloneDX or SPDX SBOM document for this component. May be a                  
-	// relative path, absolute URI, or fragment identifier.                                                       
-	SbomRef                                                                                     *string           `json:"sbomRef,omitempty"`
 	// Label selector to match targets belonging to this component during migration. Targets                      
 	// with matching labels are automatically included.                                                           
 	TargetSelector                                                                              map[string]string `json:"targetSelector,omitempty"`
-	// Component type discriminator. Same values as Target types.                                                 
+	// Component type discriminator. Same values as Target types, plus aiModel and dataset (thin                  
+	// AI subject components whose detail lives in an attached ai-model / dataset BOM).                           
 	Type                                                                                        TargetType        `json:"type"`
 	// Fully qualified domain name.                                                                               
 	FQDN                                                                                        *string           `json:"fqdn,omitempty"`
@@ -924,8 +940,6 @@ type Component struct {
 	OSName                                                                                      *string           `json:"osName,omitempty"`
 	// Operating system version.                                                                                  
 	OSVersion                                                                                   *string           `json:"osVersion,omitempty"`
-	// Image digest for immutable reference.                                                                      
-	Digest                                                                                      *string           `json:"digest,omitempty"`
 	// Container image ID.                                                                                        
 	ImageID                                                                                     *string           `json:"imageId,omitempty"`
 	// Container registry. Example: 'docker.io'.                                                                  
@@ -953,6 +967,11 @@ type Component struct {
 	// Package version.                                                                                           
 	//                                                                                                            
 	// Database version.                                                                                          
+	//                                                                                                            
+	// Model version, revision, or checkpoint tag.                                                                
+	//                                                                                                            
+	// Dataset version, release identifier, or — for highly dynamic datasets — a timestamped                      
+	// release marker.                                                                                            
 	Version                                                                                     *string           `json:"version,omitempty"`
 	// Cloud account identifier.                                                                                  
 	AccountID                                                                                   *string           `json:"accountId,omitempty"`
@@ -978,8 +997,6 @@ type Component struct {
 	URL                                                                                         *string           `json:"url,omitempty"`
 	// Environment. Example: 'production', 'staging', 'development'.                                              
 	Environment                                                                                 *string           `json:"environment,omitempty"`
-	// Package checksum for verification.                                                                         
-	Checksum                                                                                    *string           `json:"checksum,omitempty"`
 	// Package manager. Example: 'npm', 'maven', 'pip', 'nuget'.                                                  
 	PackageManager                                                                              *string           `json:"packageManager,omitempty"`
 	// Package name.                                                                                              
@@ -994,6 +1011,191 @@ type Component struct {
 	Host                                                                                        *string           `json:"host,omitempty"`
 	// Database port.                                                                                             
 	Port                                                                                        *int64            `json:"port,omitempty"`
+	// Provider/registry identifier for the model. Examples: a Hugging Face repo id                               
+	// ('meta-llama/Llama-2-7b-hf') or a model purl. Correlates the component to its ai-model                     
+	// BOM(s) and to lineage references from other models.                                                        
+	ModelID                                                                                     *string           `json:"modelId,omitempty"`
+	// Provider/registry identifier for the dataset. Examples: a Hugging Face dataset repo id                     
+	// ('HuggingFaceH4/ultrachat_200k'), a DOI, or a dataset purl. Correlates the component to                    
+	// its dataset BOM(s) and to datasetRefs from ai-model components.                                            
+	DatasetID                                                                                   *string           `json:"datasetId,omitempty"`
+}
+
+type BillOfMaterials struct {
+	// The manifest kind. Determines which normalized type-extension (model/dataset/packages)                         
+	// may appear.                                                                                                    
+	BOMType                                                                                    string                 `json:"bomType"`
+	// Normalized dataset extension. Permitted only when bomType is dataset.                                          
+	Dataset                                                                                    *DatasetBOMExtension   `json:"dataset,omitempty"`
+	// Passthrough by embedding: the native manifest carried opaquely (e.g. a raw CycloneDX or                        
+	// SPDX object). HDF does not constrain its internal shape — full manifest validation is a                        
+	// tool-level concern.                                                                                            
+	Document                                                                                   map[string]interface{} `json:"document,omitempty"`
+	// Source manifest format the BOM was produced from or references. Examples: cyclonedx,                           
+	// cyclonedx-ml, spdx, spdx-ai, huggingface, croissant. Free-form so new formats need no                          
+	// schema change; the converter that emits the BOM owns the value.                                                
+	Format                                                                                     string                 `json:"format"`
+	// Integrity of the carried BOM *document* itself (the referenced/embedded manifest file),                        
+	// NOT the integrity of the BOM's subject artifact. Subject/artifact integrity (model                             
+	// weights, dataset archive) is a component-level concern, not carried here. Subject                              
+	// identity is inherited from the host component/system; per-node identity lives in the                           
+	// type-extension.                                                                                                
+	Hashes                                                                                     []Checksum             `json:"hashes,omitempty"`
+	// Optional license of the BOM document as a whole (SPDX license expression). Nullable and                        
+	// often meaningless (CBOM algorithms, many HBOM parts have no license); per-node licenses                        
+	// live in the type-extension, not here.                                                                          
+	License                                                                                    *string                `json:"license,omitempty"`
+	// Normalized ai-model extension. Permitted only when bomType is ai-model.                                        
+	Model                                                                                      *AIModelBOMExtension   `json:"model,omitempty"`
+	// Normalized sbom extension: the flattened software package inventory. Permitted only when                       
+	// bomType is sbom.                                                                                               
+	Packages                                                                                   []SBOMPackage          `json:"packages,omitempty"`
+	// Passthrough by reference: URI (relative path, absolute URI, or fragment) to the native                         
+	// manifest document. Present for externally-hosted BOMs.                                                         
+	Ref                                                                                        *string                `json:"ref,omitempty"`
+	// Optional stable identifier for this BOM document (e.g. CycloneDX serialNumber, SPDX                            
+	// documentNamespace). Correlates the same BOM across evidence packages.                                          
+	UniqueID                                                                                   *string                `json:"uniqueId,omitempty"`
+}
+
+// Normalized dataset extension. Permitted only when bomType is dataset.
+//
+// Normalized dataset fields (SPDX 3.0 Dataset profile / MLCommons Croissant aligned). All
+// optional; open for partial-fidelity passthrough of unmapped native fields. Symmetric with
+// AI_Model_Extension: carries the dataset's own lineage (baseDatasetRefs/derivation) just
+// as the model extension carries baseModelRef/adaptationType.
+type DatasetBOMExtension struct {
+	// References to the source dataset(s) this one was derived from — a dataset componentId, or                       
+	// a dataset BOM uniqueId/URI when no component exists. The lineage edge parallel to                               
+	// ai-model's baseModelRef; the base dataset may carry its own dataset BOM.                                        
+	BaseDatasetRefs                                                                             []string               `json:"baseDatasetRefs,omitempty"`
+	// Sensitivity/classification of the data. Examples: public, internal, confidential, pii,                          
+	// phi.                                                                                                            
+	DataClassification                                                                          *string                `json:"dataClassification,omitempty"`
+	// Physical format of the dataset. Examples: parquet, csv, jsonl, tfrecord, webdataset.                            
+	DatasetFormat                                                                               *string                `json:"datasetFormat,omitempty"`
+	// Relationship of this dataset to baseDatasetRefs, parallel to the model extension's                              
+	// adaptationType. Minimal + extensible: filtered (subset by rule), augmented                                      
+	// (added/synthesized records), merged (union of sources), sampled (statistical draw).                             
+	Derivation                                                                                  *DatasetDerivationType `json:"derivation,omitempty"`
+	// Free-text statement of the dataset's intended use (CISA/G7 minimum element).                                    
+	IntendedUse                                                                                 *string                `json:"intendedUse,omitempty"`
+	// Content modality/kind of the data (CISA/G7 'Dataset content: modality'). Examples: text,                        
+	// image, tabular, timeseries, audio. DISTINCT from datasetFormat, which is the physical                           
+	// encoding (parquet/csv). Resolves SPDX 3.0 dataset_datasetType, which is content-kind, not                       
+	// physical format. String or array of strings.                                                                    
+	Modality                                                                                    *Modality              `json:"modality,omitempty"`
+	// Free-text description of the dataset's origin and collection process (CISA/G7 'Dataset                          
+	// provenance'; SPDX 3.0 dataset_dataCollectionProcess).                                                           
+	Provenance                                                                                  *string                `json:"provenance,omitempty"`
+	// Number of records/examples in the dataset.                                                                      
+	RecordCount                                                                                 *int64                 `json:"recordCount,omitempty"`
+	// Free-text summary of the dataset's statistical properties (CISA/G7 minimum element;                             
+	// open-ended by design). Intentionally free-text and will remain so permanently:                                  
+	// recordCount is the one structured statistic, and restructuring this into an object later                        
+	// would break existing consumers, so it stays a string (additive-only).                                           
+	StatisticalProperties                                                                       *string                `json:"statisticalProperties,omitempty"`
+}
+
+// Normalized ai-model extension. Permitted only when bomType is ai-model.
+//
+// Normalized AI-model fields, aligned to the CISA/G7 'SBOM for AI' minimum elements. All
+// fields optional (standards-correct; only the EU AI Act makes a subset binding for
+// high-risk/GPAI). Left open (additionalProperties: true) so a converter can carry unmapped
+// native fields opaquely (partial-fidelity pattern). Subject name/version are inherited
+// from the host aiModel component, not repeated here.
+type AIModelBOMExtension struct {
+	// Lineage relationship to baseModelRef, adopting Hugging Face's base_model_relation                             
+	// vocabulary (the only typed lineage enum in the ecosystem).                                                    
+	AdaptationType                                                                              *ModelAdaptationType `json:"adaptationType,omitempty"`
+	// Reference to the base model this one was adapted from (e.g. a Hugging Face repo id or                         
+	// purl). Correlates the lineage edge; the base model itself may carry its own ai-model BOM.                     
+	BaseModelRef                                                                                *string              `json:"baseModelRef,omitempty"`
+	// References to the training/evaluation datasets this model was produced from — preferably                      
+	// a dataset component's componentId (correlating to a first-class dataset subject rather                        
+	// than duplicating dataset detail, per ADR §10), or a dataset BOM uniqueId/URI when no                          
+	// component exists.                                                                                             
+	DatasetRefs                                                                                 []string             `json:"datasetRefs,omitempty"`
+	// Training hyper-parameters as name/value pairs (epochs, learning-rate, batch-size). This                       
+	// is the set of training knobs, NOT the model's trainable parameterCount — the two are                          
+	// routinely conflated. CISA/G7 'Model properties: hyper-parameters'; SPDX 3.0                                   
+	// ai_hyperparameter.                                                                                            
+	Hyperparameters                                                                             []Hyperparameter     `json:"hyperparameters,omitempty"`
+	// Model input/output properties (CISA/G7 minimum element): I/O data types, modality,                            
+	// context/sequence length, and tokenizer. Sourced from CycloneDX                                                
+	// modelParameters.inputs[].format / outputs[].format. All sub-fields optional.                                  
+	InputOutput                                                                                 *InputOutput         `json:"inputOutput,omitempty"`
+	// Free-text statement of intended use and out-of-scope uses (CISA/G7 minimum element).                          
+	IntendedUse                                                                                 *string              `json:"intendedUse,omitempty"`
+	// Model's learning/training paradigm. Free-text because the value set varies across                             
+	// standards. Examples: supervised, self-supervised, semi-supervised, reinforcement.                             
+	// Cross-standard intersection: SPDX 3.0 ai_typeOfModel ∩ CycloneDX                                              
+	// modelParameters.approach.type ∩ CISA/G7 learning type.                                                        
+	LearningApproach                                                                            *string              `json:"learningApproach,omitempty"`
+	// Model architecture family. Examples: transformer, cnn, diffusion, mixture-of-experts.                         
+	ModelArchitecture                                                                           *string              `json:"modelArchitecture,omitempty"`
+	// Total trainable parameter count. No native CycloneDX/SPDX field exists; first-class here                      
+	// because the EU AI Act keys GPAI obligations off model scale.                                                  
+	ParameterCount                                                                              *int64               `json:"parameterCount,omitempty"`
+	// Reported evaluation metrics as name/value pairs. Values are free-text because metrics are                     
+	// heterogeneous (accuracy, f1, BLEU, latency). The item stays open (additionalProperties:                       
+	// true) to carry native CycloneDX slice/confidenceInterval detail opaquely. Cross-standard                      
+	// intersection: SPDX 3.0 ai_metric ∩ CycloneDX quantitativeAnalysis.performanceMetrics ∩                        
+	// CISA/G7 KPI cluster.                                                                                          
+	PerformanceMetrics                                                                          []PerformanceMetric  `json:"performanceMetrics,omitempty"`
+	// On-disk weight serialization format. Security-critical yet under-modeled by BOM specs:                        
+	// pickle/pytorch permits arbitrary code execution on load; safetensors does not. Examples:                      
+	// safetensors, pytorch, gguf, onnx, tensorflow.                                                                 
+	SerializationFormat                                                                         *string              `json:"serializationFormat,omitempty"`
+	// The ML task the model performs. Free-text. Examples: text-classification,                                     
+	// sentiment-analysis, object-detection, translation. Sourced from CycloneDX                                     
+	// modelParameters.task (SPDX 3.0 ai_domain is domain-level/adjacent, not the task); CISA/G7                     
+	// intended-application.                                                                                         
+	Task                                                                                        *string              `json:"task,omitempty"`
+}
+
+type Hyperparameter struct {
+	// Hyper-parameter name. Examples: epochs, learning-rate, batch-size.        
+	Name                                                                 *string `json:"name,omitempty"`
+	// Hyper-parameter value (free-text).                                        
+	Value                                                                *string `json:"value,omitempty"`
+}
+
+// Model input/output properties (CISA/G7 minimum element): I/O data types, modality,
+// context/sequence length, and tokenizer. Sourced from CycloneDX
+// modelParameters.inputs[].format / outputs[].format. All sub-fields optional.
+type InputOutput struct {
+	// Maximum context/sequence length the model accepts, in tokens.                                   
+	ContextLength                                                                            *int64    `json:"contextLength,omitempty"`
+	// Input/output data types. Examples: string, byte[], float32, image.                              
+	DataTypes                                                                                []string  `json:"dataTypes,omitempty"`
+	// Input/output modalities. String or array of strings. Examples: text, image, audio.              
+	// Symmetric with Dataset_Extension.modality.                                                      
+	Modality                                                                                 *Modality `json:"modality,omitempty"`
+	// Tokenizer used for the model's input encoding. Examples: BPE, SentencePiece, tiktoken.          
+	Tokenizer                                                                                *string   `json:"tokenizer,omitempty"`
+}
+
+type PerformanceMetric struct {
+	// Metric name. Examples: accuracy, f1, BLEU, latency.                                             
+	Name                                                                                       *string `json:"name,omitempty"`
+	// Reported metric value, free-text because metrics are heterogeneous (percentages, scores,        
+	// milliseconds).                                                                                  
+	Value                                                                                      *string `json:"value,omitempty"`
+}
+
+// A single normalized software package entry within an sbom BOM. Minimal identity + version
+// for querying/diffing; the full native record remains available via passthrough
+// (document/ref).
+type SBOMPackage struct {
+	// SPDX license identifiers/expressions for this package.                          
+	Licenses                                                                  []string `json:"licenses,omitempty"`
+	// Package name.                                                                   
+	Name                                                                      string   `json:"name"`
+	// Package URL (purl) — the preferred cross-BOM identity key when present.         
+	Purl                                                                      *string  `json:"purl,omitempty"`
+	// Package version.                                                                
+	Version                                                                   *string  `json:"version,omitempty"`
 }
 
 // An override of a baseline input value for a specific component. Enables system-specific
@@ -1243,39 +1445,44 @@ type BaselineRequirement struct {
 // Structured comparison between two or more HDF security assessment documents. Supports
 // temporal, baseline, fleet, and multi-source comparison modes.
 type HDFComparison struct {
-	// Map of annotation IDs to annotation objects, providing context or action items for                            
-	// requirement diffs.                                                                                            
-	Annotations                                                                               map[string]Annotation  `json:"annotations,omitempty"`
-	// Comparison of baselines between sources.                                                                      
-	BaselineDiffs                                                                             []BaselineDiff         `json:"baselineDiffs,omitempty"`
-	// The mode of comparison being performed.                                                                       
-	ComparisonMode                                                                            ComparisonMode         `json:"comparisonMode"`
-	// Comparison of components between two system documents. Used in systemDrift mode.                              
-	ComponentDiffs                                                                            []ComponentDiff        `json:"componentDiffs,omitempty"`
-	// External/metadata changes separate from status changes (Terraform pattern).                                   
-	Drift                                                                                     []RequirementDiff      `json:"drift,omitempty"`
-	// Reserved for tool-specific data not defined in the HDF standard.                                              
-	Extensions                                                                                map[string]interface{} `json:"extensions,omitempty"`
-	// Schema version for this comparison format.                                                                    
-	FormatVersion                                                                             FormatVersion          `json:"formatVersion"`
-	// Information about the tool that generated this comparison.                                                    
-	Generator                                                                                 *Generator             `json:"generator,omitempty"`
-	// Cryptographic integrity information for verifying this comparison document.                                   
-	Integrity                                                                                 *Integrity             `json:"integrity,omitempty"`
-	// Configuration for how requirements were matched across sources.                                               
-	Matching                                                                                  *MatchingConfig        `json:"matching,omitempty"`
-	// Comparison of packages between two SBOMs. Used in systemDrift mode for SBOM comparison.                       
-	PackageDiffs                                                                              []PackageDiff          `json:"packageDiffs,omitempty"`
-	// Detailed comparison of individual requirements between sources.                                               
-	RequirementDiffs                                                                          []RequirementDiff      `json:"requirementDiffs"`
-	// The source documents being compared. At least two sources are required.                                       
-	Sources                                                                                   []Source               `json:"sources"`
-	// Summary statistics for the overall comparison.                                                                
-	Summary                                                                                   ComparisonSummary      `json:"summary"`
-	// URI identifying the system being compared in systemDrift mode.                                                
-	SystemRef                                                                                 *string                `json:"systemRef,omitempty"`
-	// When this comparison was performed.                                                                           
-	Timestamp                                                                                 *time.Time             `json:"timestamp,omitempty"`
+	// Map of annotation IDs to annotation objects, providing context or action items for                              
+	// requirement diffs.                                                                                              
+	Annotations                                                                                 map[string]Annotation  `json:"annotations,omitempty"`
+	// Comparison of baselines between sources.                                                                        
+	BaselineDiffs                                                                               []BaselineDiff         `json:"baselineDiffs,omitempty"`
+	// The mode of comparison being performed.                                                                         
+	ComparisonMode                                                                              ComparisonMode         `json:"comparisonMode"`
+	// Comparison of components between two system documents. Used in systemDrift mode. A                              
+	// component's BOM changes surface as a field change on its boms[] here.                                           
+	ComponentDiffs                                                                              []ComponentDiff        `json:"componentDiffs,omitempty"`
+	// External/metadata changes separate from status changes (Terraform pattern).                                     
+	Drift                                                                                       []RequirementDiff      `json:"drift,omitempty"`
+	// Reserved for tool-specific data not defined in the HDF standard.                                                
+	Extensions                                                                                  map[string]interface{} `json:"extensions,omitempty"`
+	// Schema version for this comparison format.                                                                      
+	FormatVersion                                                                               FormatVersion          `json:"formatVersion"`
+	// Information about the tool that generated this comparison.                                                      
+	Generator                                                                                   *Generator             `json:"generator,omitempty"`
+	// Cryptographic integrity information for verifying this comparison document.                                     
+	Integrity                                                                                   *Integrity             `json:"integrity,omitempty"`
+	// Configuration for how requirements were matched across sources.                                                 
+	Matching                                                                                    *MatchingConfig        `json:"matching,omitempty"`
+	// RESERVED — not emitted by the current systemDrift comparison. systemDrift now reports a                         
+	// component's BOM changes as a field change on its boms[] (see componentDiffs), and                               
+	// standalone SBOM package diffing is a separate `hdf diff <sbom> <sbom>` output shape. This                       
+	// field is retained for a future normalized package-level diff; consumers must not expect                         
+	// it from today's systemDrift output.                                                                             
+	PackageDiffs                                                                                []PackageDiff          `json:"packageDiffs,omitempty"`
+	// Detailed comparison of individual requirements between sources.                                                 
+	RequirementDiffs                                                                            []RequirementDiff      `json:"requirementDiffs"`
+	// The source documents being compared. At least two sources are required.                                         
+	Sources                                                                                     []Source               `json:"sources"`
+	// Summary statistics for the overall comparison.                                                                  
+	Summary                                                                                     ComparisonSummary      `json:"summary"`
+	// URI identifying the system being compared in systemDrift mode.                                                  
+	SystemRef                                                                                   *string                `json:"systemRef,omitempty"`
+	// When this comparison was performed.                                                                             
+	Timestamp                                                                                   *time.Time             `json:"timestamp,omitempty"`
 }
 
 // An annotation attached to a comparison, providing context or action items.
@@ -1415,21 +1622,28 @@ type MatchingConfig struct {
 	PrimaryStrategy                                                                              MatchStrategy   `json:"primaryStrategy"`
 }
 
-// Comparison of a single package between two SBOM versions, matched by purl.
+// Comparison of a single BOM node between two BOM versions, matched by purl (software) or
+// identifier (models, datasets, hardware, crypto).
 type PackageDiff struct {
-	// License identifiers for this package.                                                               
-	Licenses                                                                              []string         `json:"licenses,omitempty"`
-	// Human-readable package name.                                                                        
-	Name                                                                                  *string          `json:"name,omitempty"`
-	// Package version in the new SBOM.                                                                    
-	NewVersion                                                                            *string          `json:"newVersion,omitempty"`
-	// Package version in the old SBOM.                                                                    
-	OldVersion                                                                            *string          `json:"oldVersion,omitempty"`
-	// Package URL (purl) used as the identity key for matching across SBOMs.                              
-	Purl                                                                                  string           `json:"purl"`
-	// The state of this package: added (new in new SBOM), removed (absent from new SBOM),                 
-	// updated (version changed), unchanged.                                                               
-	State                                                                                 PackageDiffState `json:"state"`
+	// Generic identity key for matching a BOM node across versions when no purl applies — e.g.                 
+	// a Hugging Face model ref, dataset uniqueId, crypto algorithm OID, or hardware part                       
+	// number. At least one of purl or identifier is required.                                                  
+	Identifier                                                                                 *string          `json:"identifier,omitempty"`
+	// License identifiers for this package.                                                                    
+	Licenses                                                                                   []string         `json:"licenses,omitempty"`
+	// Human-readable node name.                                                                                
+	Name                                                                                       *string          `json:"name,omitempty"`
+	// Package version in the new SBOM.                                                                         
+	NewVersion                                                                                 *string          `json:"newVersion,omitempty"`
+	// Package version in the old SBOM.                                                                         
+	OldVersion                                                                                 *string          `json:"oldVersion,omitempty"`
+	// Package URL (purl) — the preferred identity key for matching software packages across                    
+	// BOMs. Optional: BOM nodes without a purl (AI models, datasets, hardware parts, crypto                    
+	// algorithms) key on identifier instead.                                                                   
+	Purl                                                                                       *string          `json:"purl,omitempty"`
+	// The state of this package: added (new in new SBOM), removed (absent from new SBOM),                      
+	// updated (version changed), unchanged.                                                                    
+	State                                                                                      PackageDiffState `json:"state"`
 }
 
 // A source document participating in the comparison.
@@ -1569,13 +1783,19 @@ type HDFSystem struct {
 	AuthorizationDate                                                                           *time.Time           `json:"authorizationDate,omitempty"`
 	// Current Authorization to Operate (ATO) status.                                                                
 	AuthorizationStatus                                                                         *AuthorizationStatus `json:"authorizationStatus,omitempty"`
+	// System-scoped Bills of Materials whose subject is the authorization boundary rather than                      
+	// a single component (e.g. a SaaSBOM of services, a KBOM of cluster inventory, an OBOM).                        
+	// Component-scoped BOMs (SBOM, ai-model) attach on the component instead. See                                   
+	// primitives/bom.schema.json.                                                                                   
+	Boms                                                                                        []BillOfMaterials    `json:"boms,omitempty"`
 	// Description of the system's authorization boundary. Example: network CIDR blocks, cloud                       
 	// VPC IDs, physical locations.                                                                                  
 	BoundaryDescription                                                                         *string              `json:"boundaryDescription,omitempty"`
 	// FIPS 199 security categorization (impact level).                                                              
 	CategorizationLevel                                                                         *CategorizationLevel `json:"categorizationLevel,omitempty"`
 	// System components within the authorization boundary. Uses the full polymorphic Component                      
-	// type with stable identity (componentId), external references, and SBOM support.                               
+	// type with stable identity (componentId), external references, and generalized BOM                             
+	// attachment (boms[]).                                                                                          
 	Components                                                                                  []Component          `json:"components"`
 	// Declares which controls are common, hybrid, or system-specific, and which component                           
 	// provides them. Maps to NIST SP 800-53 control designations and OSCAL                                          
@@ -1911,7 +2131,7 @@ type SBOMCoverage struct {
 	TotalComponents                                             *int64 `json:"totalComponents,omitempty"`
 }
 
-// A reference to an HDF document or SBOM included in the evidence package.
+// A reference to an HDF document or BOM/manifest included in the evidence package.
 type ContentReference struct {
 	// Cryptographic checksum for verifying the referenced document's integrity.                          
 	Checksum                                                                                  *Checksum   `json:"checksum,omitempty"`
@@ -1961,10 +2181,12 @@ const (
 
 // The hash algorithm used for the checksum.
 //
-// Supported cryptographic hash algorithms for checksums and integrity verification.
+// Supported cryptographic hash algorithms for checksums and integrity verification. blake3
+// covers container-image and other artifact digests that use it.
 type HashAlgorithm string
 
 const (
+	Blake3 HashAlgorithm = "blake3"
 	Sha256 HashAlgorithm = "sha256"
 	Sha384 HashAlgorithm = "sha384"
 	Sha512 HashAlgorithm = "sha512"
@@ -2226,6 +2448,29 @@ const (
 	VerificationMethodEnumHybrid    VerificationMethodEnum = "hybrid"
 )
 
+// Relationship of this dataset to baseDatasetRefs, parallel to the model extension's
+// adaptationType. Minimal + extensible: filtered (subset by rule), augmented
+// (added/synthesized records), merged (union of sources), sampled (statistical draw).
+type DatasetDerivationType string
+
+const (
+	Augmented                   DatasetDerivationType = "augmented"
+	DatasetDerivationTypeMerged DatasetDerivationType = "merged"
+	Filtered                    DatasetDerivationType = "filtered"
+	Sampled                     DatasetDerivationType = "sampled"
+)
+
+// Lineage relationship to baseModelRef, adopting Hugging Face's base_model_relation
+// vocabulary (the only typed lineage enum in the ecosystem).
+type ModelAdaptationType string
+
+const (
+	Adapter   ModelAdaptationType = "adapter"
+	Finetune  ModelAdaptationType = "finetune"
+	Merge     ModelAdaptationType = "merge"
+	Quantized ModelAdaptationType = "quantized"
+)
+
 type CloudProvider string
 
 const (
@@ -2236,18 +2481,12 @@ const (
 	Oci                CloudProvider = "oci"
 )
 
-// Format of the SBOM (embedded or referenced). Required when sbom or sbomRef is present.
-type SBOMFormat string
-
-const (
-	Cyclonedx SBOMFormat = "cyclonedx"
-	Spdx      SBOMFormat = "spdx"
-)
-
-// Component type discriminator. Same values as Target types.
+// Component type discriminator. Same values as Target types, plus aiModel and dataset (thin
+// AI subject components whose detail lives in an attached ai-model / dataset BOM).
 type TargetType string
 
 const (
+	AIModel           TargetType = "aiModel"
 	Application       TargetType = "application"
 	Artifact          TargetType = "artifact"
 	CloudAccount      TargetType = "cloudAccount"
@@ -2256,6 +2495,7 @@ const (
 	ContainerInstance TargetType = "containerInstance"
 	ContainerPlatform TargetType = "containerPlatform"
 	Database          TargetType = "database"
+	Dataset           TargetType = "dataset"
 	Host              TargetType = "host"
 	Network           TargetType = "network"
 	Repository        TargetType = "repository"
@@ -2371,10 +2611,10 @@ type RequirementState string
 
 const (
 	Fixed                     RequirementState = "fixed"
-	Merged                    RequirementState = "merged"
 	Moved                     RequirementState = "moved"
 	Regressed                 RequirementState = "regressed"
 	RequirementStateAbsent    RequirementState = "absent"
+	RequirementStateMerged    RequirementState = "merged"
 	RequirementStateNew       RequirementState = "new"
 	RequirementStateUnchanged RequirementState = "unchanged"
 	RequirementStateUpdated   RequirementState = "updated"
@@ -2481,17 +2721,20 @@ const (
 
 // The type of HDF document being referenced.
 //
-// The type of document referenced in the evidence package.
+// The type of document referenced in the evidence package. 'bom' covers any
+// Bill-of-Materials/manifest document (SBOM, AI model/dataset, and reserved future kinds) —
+// its specific kind is carried by the referenced document's bomType, not by a per-kind
+// Content_Type value.
 type ContentType string
 
 const (
+	BOM           ContentType = "bom"
 	HdfAmendments ContentType = "hdf-amendments"
 	HdfBaseline   ContentType = "hdf-baseline"
 	HdfComparison ContentType = "hdf-comparison"
 	HdfPlan       ContentType = "hdf-plan"
 	HdfResults    ContentType = "hdf-results"
 	HdfSystem     ContentType = "hdf-system"
-	Sbom          ContentType = "sbom"
 )
 
 type Ref struct {
@@ -2512,6 +2755,33 @@ func (x *Ref) UnmarshalJSON(data []byte) error {
 
 func (x *Ref) MarshalJSON() ([]byte, error) {
 	return marshalUnion(nil, nil, nil, x.String, x.AnythingMapArray != nil, x.AnythingMapArray, false, nil, false, nil, false, nil, false)
+}
+
+// Content modality/kind of the data (CISA/G7 'Dataset content: modality'). Examples: text,
+// image, tabular, timeseries, audio. DISTINCT from datasetFormat, which is the physical
+// encoding (parquet/csv). Resolves SPDX 3.0 dataset_datasetType, which is content-kind, not
+// physical format. String or array of strings.
+//
+// Input/output modalities. String or array of strings. Examples: text, image, audio.
+// Symmetric with Dataset_Extension.modality.
+type Modality struct {
+	String      *string
+	StringArray []string
+}
+
+func (x *Modality) UnmarshalJSON(data []byte) error {
+	x.StringArray = nil
+	object, err := unmarshalUnion(data, nil, nil, nil, &x.String, true, &x.StringArray, false, nil, false, nil, false, nil, false)
+	if err != nil {
+		return err
+	}
+	if object {
+	}
+	return nil
+}
+
+func (x *Modality) MarshalJSON() ([]byte, error) {
+	return marshalUnion(nil, nil, nil, x.String, x.StringArray != nil, x.StringArray, false, nil, false, nil, false, nil, false)
 }
 
 func unmarshalUnion(data []byte, pi **int64, pf **float64, pb **bool, ps **string, haveArray bool, pa interface{}, haveObject bool, pc interface{}, haveMap bool, pm interface{}, haveEnum bool, pe interface{}, nullable bool) (bool, error) {

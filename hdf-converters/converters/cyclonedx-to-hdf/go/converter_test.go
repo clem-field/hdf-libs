@@ -342,7 +342,23 @@ func TestConvertCycloneDX_NoVulnSBOM_Rejected(t *testing.T) {
 	_, err := ConvertCycloneDXToHDF(input, testVersion)
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "SBOM inventory with no vulnerabilities")
-	assert.Contains(t, err.Error(), "hdf system create")
+	assert.Contains(t, err.Error(), "hdf system create <sbom-file> --component-name <name>")
+	// Plain-SBOM branch must not suggest the AI-BOM path.
+	assert.NotContains(t, err.Error(), "cyclonedx-mlbom")
+}
+
+func TestConvertCycloneDX_NoVulnAIBOM_Rejected(t *testing.T) {
+	input := []byte(`{
+		"bomFormat": "CycloneDX",
+		"specVersion": "1.6",
+		"components": [
+			{"type": "machine-learning-model", "name": "stable-diffusion", "bom-ref": "model-a"}
+		]
+	}`)
+	_, err := ConvertCycloneDXToHDF(input, testVersion)
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "AI-BOM")
+	assert.Contains(t, err.Error(), "hdf system create <file> --from cyclonedx-mlbom")
 }
 
 // ---- VEX format ----
@@ -437,6 +453,39 @@ func TestSeverityToImpact(t *testing.T) {
 			assert.InDelta(t, tc.expected, severityToImpact(tc.severity), 0.001)
 		})
 	}
+}
+
+// ---- Component boms[] attachment (ADR-0001 Phase 3) ----
+
+func TestConvertCycloneDX_ComponentBoms(t *testing.T) {
+	// minimal-vulns.json has 2 components → boms[] carries normalized packages
+	// plus the raw document passthrough.
+	input := loadFixture(t, "input/minimal-vulns.json")
+	result, err := ConvertCycloneDXToHDF(input, testVersion)
+	require.NoError(t, err)
+
+	require.Len(t, result.Components, 1)
+	boms := result.Components[0].Boms
+	require.Len(t, boms, 1)
+	assert.Equal(t, "sbom", boms[0].BOMType)
+	assert.Equal(t, "cyclonedx", boms[0].Format)
+	assert.NotEmpty(t, boms[0].Packages, "component input should yield normalized packages")
+	assert.NotNil(t, boms[0].Document, "raw manifest should be carried via document passthrough")
+}
+
+func TestConvertCycloneDX_ComponentBomsVulnOnly(t *testing.T) {
+	// vex.json has no components → boms[] carries the document only, no packages.
+	input := loadFixture(t, "input/vex.json")
+	result, err := ConvertCycloneDXToHDF(input, testVersion)
+	require.NoError(t, err)
+
+	require.Len(t, result.Components, 1)
+	boms := result.Components[0].Boms
+	require.Len(t, boms, 1)
+	assert.Equal(t, "sbom", boms[0].BOMType)
+	assert.Equal(t, "cyclonedx", boms[0].Format)
+	assert.Empty(t, boms[0].Packages, "vuln-only input should carry no packages")
+	assert.NotNil(t, boms[0].Document, "raw manifest should be carried via document passthrough")
 }
 
 func TestSnapshots(t *testing.T) {

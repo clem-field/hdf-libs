@@ -9,12 +9,14 @@ import (
 	"time"
 
 	"github.com/google/uuid"
+	shared "github.com/mitre/hdf-libs/hdf-converters/v3/shared/go"
+	bom "github.com/mitre/hdf-libs/hdf-converters/v3/shared/go/bom"
 	"github.com/spf13/cobra"
 )
 
 func newSystemCreateCmd() *cobra.Command {
 	var (
-		fromFile            string
+		fromFormat          string
 		outputPath          string
 		systemName          string
 		componentName       string
@@ -26,21 +28,31 @@ func newSystemCreateCmd() *cobra.Command {
 	)
 
 	cmd := &cobra.Command{
-		Use:   "create",
+		Use:   "create <bom|url> [flags]",
 		Short: "Bootstrap an HDF system document from a results file or SBOM",
 		Long: `Generate an HDF system document by extracting targets and baselines
 from an HDF results file, or by importing component metadata from a
-CycloneDX/SPDX SBOM.
+CycloneDX/SPDX SBOM, AI-BOM, or SPDX 3.0 AI/Dataset document. The input is a
+positional file path or URL. Omit --from to auto-detect the input format;
+pass --from to assert a specific BOM format (the input is detected, then the
+detected format must match — it is never force-parsed). This differs from
+` + "`hdf convert --from`" + `, which selects a parser: here --from only VERIFIES
+the auto-detected format.
+
+  --from values: cyclonedx | spdx | cyclonedx-mlbom | spdx-ai
 
 Examples:
-  hdf system create --from results.json
-  hdf system create --from results.json -o system.json
-  hdf system create --from results.json --name "Portal Prod" -o system.json
-  hdf system create --from sbom.cdx.json --component-name "WebTier" -o system.json
-  hdf system create --from results.json --owner team@agency.gov --description "Prod portal"`,
-		RunE: func(_ *cobra.Command, _ []string) error {
+  hdf system create results.json
+  hdf system create results.json -o system.json
+  hdf system create results.json --name "Portal Prod" -o system.json
+  hdf system create sbom.cdx.json --from cyclonedx --component-name "WebTier" -o system.json
+  hdf system create model.cdx.json --from cyclonedx-mlbom -o system.json
+  hdf system create results.json --owner team@agency.gov --description "Prod portal"`,
+		Args: cobra.ExactArgs(1),
+		RunE: func(_ *cobra.Command, args []string) error {
 			opts := systemCreateOpts{
-				fromFile:            fromFile,
+				fromFile:            args[0],
+				fromFormat:          fromFormat,
 				systemName:          systemName,
 				componentName:       componentName,
 				outputPath:          outputPath,
@@ -54,7 +66,7 @@ Examples:
 		},
 	}
 
-	cmd.Flags().StringVar(&fromFile, "from", "", "HDF results file or CycloneDX/SPDX SBOM (required)")
+	cmd.Flags().StringVar(&fromFormat, "from", "", "Verify the detected BOM format: cyclonedx | spdx | cyclonedx-mlbom | spdx-ai (default: auto-detect; never force-parses)")
 	cmd.Flags().StringVarP(&outputPath, "output", "o", "", "Output file (default: stdout)")
 	cmd.Flags().StringVar(&systemName, "name", "", "System name (default: derived from input)")
 	cmd.Flags().StringVar(&componentName, "component-name", "", "Component name (for SBOM input)")
@@ -64,11 +76,72 @@ Examples:
 	cmd.Flags().BoolVar(&embed, "embed", false, "Embed referenced data (e.g. SBOM) inline instead of storing a reference")
 	cmd.Flags().BoolVar(&generateComponentID, "generate-component-id", false, "Auto-assign UUID componentId to each component")
 
-	if err := cmd.MarkFlagRequired("from"); err != nil {
-		panic(fmt.Sprintf("failed to mark flag required: %v", err))
-	}
-
 	return cmd
+}
+
+// bomFormatAliases lists the valid --from format-assertion aliases shared by the
+// `hdf system` command group. One canonical spelling per format; accepted ==
+// advertised.
+var bomFormatAliases = []string{"cyclonedx", "spdx", "cyclonedx-mlbom", "spdx-ai"}
+
+// assertBomFormat verifies that doc's structurally-detected BOM format matches
+// the requested --from alias. An empty alias performs no assertion (auto-detect).
+// It never force-parses: on a mismatch, an unrecognized alias, or an
+// undetectable input it returns an error rather than coercing the input.
+func assertBomFormat(alias string, doc map[string]interface{}) error {
+	if alias == "" {
+		return nil
+	}
+	return assertBomFormatDetected(alias, bom.DetectFormat(doc))
+}
+
+// assertBomFormatDetected is assertBomFormat against an already-detected format,
+// letting callers that have run bom.DetectFormat once avoid re-detecting.
+func assertBomFormatDetected(alias string, detected *bom.FormatDetection) error {
+	if alias == "" {
+		return nil
+	}
+	detectedName := "unrecognized (not a BOM)"
+	if detected != nil {
+		detectedName = detected.Format
+	}
+	switch alias {
+	case "cyclonedx":
+		if detected == nil || detected.Format != bom.FormatCycloneDX {
+			return bomFormatMismatch(alias, "a plain CycloneDX SBOM", detectedName)
+		}
+	case "spdx":
+		if detected == nil || detected.Format != bom.FormatSPDX {
+			return bomFormatMismatch(alias, "a plain SPDX SBOM", detectedName)
+		}
+	case "cyclonedx-mlbom":
+		if detected == nil || detected.Format != bom.FormatCycloneDXML {
+			return bomFormatMismatch(alias, "a CycloneDX ML-BOM (a machine-learning-model component)", detectedName)
+		}
+	case "spdx-ai":
+		if detected == nil || detected.Format != bom.FormatSPDX3AI {
+			return bomFormatMismatch(alias, "an SPDX 3.0 AI/Dataset document", detectedName)
+		}
+	default:
+		return fmt.Errorf("unknown --from format %q; valid formats: %s", alias, strings.Join(bomFormatAliases, ", "))
+	}
+	return nil
+}
+
+func bomFormatMismatch(alias, expected, detected string) error {
+	return fmt.Errorf("--from %s expects %s, but the input was detected as %q; "+
+		"pass the matching --from value or omit --from to auto-detect", alias, expected, detected)
+}
+
+// errFormatAssertionOnURL rejects `--from <format>` when the input is a URL: the
+// document is referenced, not fetched, so its format cannot be verified and a
+// blind assertion could mislabel a remote BOM. Returns nil when no --from is set.
+func errFormatAssertionOnURL(alias string) error {
+	if alias == "" {
+		return nil
+	}
+	return fmt.Errorf("cannot assert --from %s on a URL input: the document is referenced, "+
+		"not fetched, so its format cannot be verified; omit --from for URL references", alias)
 }
 
 // targetTypeToComponentType maps HDF Target.type to HDF Component.type. As of
@@ -93,6 +166,7 @@ func isURL(s string) bool {
 
 type systemCreateOpts struct {
 	fromFile            string
+	fromFormat          string
 	systemName          string
 	componentName       string
 	outputPath          string
@@ -104,14 +178,25 @@ type systemCreateOpts struct {
 }
 
 func runSystemCreate(opts systemCreateOpts) error {
-	// If --from is a URL, we can't read the file — require metadata flags
+	// A URL input is referenced, not fetched: it can't be read to derive
+	// component metadata, verify a --from assertion, or embed its content.
 	if isURL(opts.fromFile) {
-		return runSystemCreateFromSBOMRef(opts.fromFile, opts.systemName, opts.componentName, opts.outputPath)
+		if err := errFormatAssertionOnURL(opts.fromFormat); err != nil {
+			return err
+		}
+		if opts.embed {
+			return fmt.Errorf("--embed cannot embed a URL input: the remote document is referenced, " +
+				"not fetched; drop --embed or pass a local file")
+		}
+		return runSystemCreateFromSBOMRef(opts, opts.fromFile)
 	}
 
 	data, err := os.ReadFile(opts.fromFile) // #nosec G304 -- CLI reads user-provided file path
 	if err != nil {
 		return fmt.Errorf("failed to read input file: %w", err)
+	}
+	if err := shared.ValidateJSONSize(data, "system-create input", int(getMaxFileSize())); err != nil {
+		return err
 	}
 
 	var doc map[string]interface{}
@@ -119,57 +204,159 @@ func runSystemCreate(opts systemCreateOpts) error {
 		return fmt.Errorf("failed to parse input file: %w", err)
 	}
 
-	// Detect input type: HDF Results vs CycloneDX SBOM
-	if bomFormat, ok := doc["bomFormat"].(string); ok && bomFormat == "CycloneDX" {
-		return runSystemCreateFromSBOM(doc, opts.fromFile, opts.systemName, opts.componentName, opts.outputPath, sbomFormatCycloneDX, opts)
+	// Detect the BOM format once, then reuse it for the --from assertion and the
+	// routing switch below rather than re-probing the document. An ML-BOM wins
+	// over plain CycloneDX by detector precedence, so the AI-model path is reached
+	// before the plain-SBOM path and the model extension is normalized.
+	detected := bom.DetectFormat(doc)
+	if err := assertBomFormatDetected(opts.fromFormat, detected); err != nil {
+		return err
 	}
 
-	// Check for SPDX (has spdxVersion field)
-	if _, ok := doc["spdxVersion"]; ok {
-		return runSystemCreateFromSBOM(doc, opts.fromFile, opts.systemName, opts.componentName, opts.outputPath, sbomFormatSPDX, opts)
+	if detected != nil {
+		switch detected.Format {
+		case bom.FormatCycloneDXML:
+			return runSystemCreateFromAIModelBOM(data, doc, opts)
+		case bom.FormatCycloneDX:
+			return runSystemCreateFromSBOM(doc, opts.fromFile, opts.systemName, opts.componentName, opts.outputPath, bomFormatCycloneDX, opts)
+		case bom.FormatSPDX:
+			return runSystemCreateFromSBOM(doc, opts.fromFile, opts.systemName, opts.componentName, opts.outputPath, bomFormatSPDX, opts)
+		case bom.FormatSPDX3AI:
+			return runSystemCreateFromSPDX3AIBOM(data, doc, opts)
+		}
 	}
 
 	// Default: treat as HDF Results
 	return runSystemCreateFromResults(doc, opts.systemName, opts.outputPath, opts)
 }
 
-// runSystemCreateFromSBOMRef creates a system document from a remote SBOM URI.
-// Since we can't read the file, --component-name is required.
-func runSystemCreateFromSBOMRef(sbomURI, systemName, componentName, outputPath string) error {
-	if componentName == "" {
-		return fmt.Errorf("--component-name is required when --from is a URL\n" +
-			"(cannot read remote file to extract component metadata)")
+// runSystemCreateFromSPDX3AIBOM builds a system document from an SPDX 3.0
+// AI/Dataset document, emitting one thin aiModel component per ai_AIPackage and
+// one thin dataset component per dataset_DatasetPackage, each carrying its
+// normalized spdx-3-ai BOM in boms[]. Partial-fidelity: the shared parser lifts
+// only clean fields and carries the raw element via passthrough — never
+// fabricating fields the source omits.
+func runSystemCreateFromSPDX3AIBOM(data []byte, doc map[string]interface{}, opts systemCreateOpts) error {
+	// ParseBom enforces the input-size security boundary (and format detection);
+	// the multi-subject walk then runs off the already-parsed doc.
+	if _, err := bom.ParseBom(data); err != nil {
+		return fmt.Errorf("failed to parse SPDX-3 AI/Dataset document: %w", err)
 	}
 
+	subjects := bom.ParseSPDX3(doc).Subjects
+	if len(subjects) == 0 {
+		return fmt.Errorf("SPDX-3 document carries no AI/dataset subjects")
+	}
+
+	components := make([]map[string]interface{}, 0, len(subjects))
+	models, datasets := 0, 0
+	for _, subject := range subjects {
+		bomMap, err := structToMap(subject.Bom)
+		if err != nil {
+			return fmt.Errorf("failed to serialize normalized SPDX-3 BOM: %w", err)
+		}
+		comp := map[string]interface{}{
+			"name": subject.Name,
+			"boms": []map[string]interface{}{bomMap},
+		}
+		switch subject.Kind {
+		case "aiModel":
+			comp["type"] = compTypeAIModel
+			if subject.ID != "" {
+				comp["modelId"] = subject.ID
+			}
+			models++
+		case "dataset":
+			comp["type"] = compTypeDataset
+			if subject.ID != "" {
+				comp["datasetId"] = subject.ID
+			}
+			datasets++
+		}
+		components = append(components, comp)
+	}
+
+	systemName := opts.systemName
 	if systemName == "" {
-		systemName = componentName + "-system"
+		systemName = subjects[0].Name + "-system"
 	}
 
-	// Guess format from URL extension
-	sbomFormat := guessFormatFromURI(sbomURI)
+	fmt.Fprintf(os.Stderr, "Imported SPDX-3 AI/Dataset document (%d aiModel, %d dataset components)\n", models, datasets)
+	return writeSystemDoc(systemName, components, opts.outputPath, opts)
+}
+
+// runSystemCreateFromSBOMRef creates a system document from a remote SBOM URL.
+// The remote document is referenced, not fetched, so component metadata can't be
+// derived from it — --component-name must be supplied. All system-level opts
+// (--owner/--description/--system-id/--generate-component-id) still apply.
+func runSystemCreateFromSBOMRef(opts systemCreateOpts, sbomURI string) error {
+	if opts.componentName == "" {
+		return fmt.Errorf("--component-name is required when the input is a URL " +
+			"(the remote document can't be read to derive component metadata)")
+	}
+
+	systemName := opts.systemName
+	if systemName == "" {
+		systemName = opts.componentName + "-system"
+	}
+
+	// Guess format from URL extension; format is schema-required on the BOM entry.
+	// A hint-less URL can't be verified (the document is not fetched), so warn
+	// that the defaulted format is unverified.
+	guessed := guessFormatFromURI(sbomURI)
+	if guessed == "" {
+		fmt.Fprintf(os.Stderr, "Warning: could not infer BOM format from URL %q; defaulting to %q "+
+			"(unverified — the remote document is not fetched)\n", sbomURI, bomFormatCycloneDX)
+	}
+	bomFormat := ensureBOMFormat(guessed)
 
 	comp := map[string]interface{}{
-		"name":    componentName,
-		"type":    compTypeApplication,
-		"sbomRef": sbomURI,
-	}
-	if sbomFormat != "" {
-		comp["sbomFormat"] = sbomFormat
+		"name": opts.componentName,
+		"type": compTypeApplication,
+		"boms": []map[string]interface{}{newSBOMBom(bomFormat, sbomURI, nil)},
 	}
 
-	fmt.Fprintf(os.Stderr, "Created component %q from URI (type: %s)\n", componentName, compTypeApplication)
+	fmt.Fprintf(os.Stderr, "Created component %q from URI (type: %s)\n", opts.componentName, compTypeApplication)
 	fmt.Fprintf(os.Stderr, "Note: component type defaulted to %q; edit the system document to correct if needed\n", compTypeApplication)
-	return writeSystemDoc(systemName, []map[string]interface{}{comp}, outputPath, systemCreateOpts{})
+	return writeSystemDoc(systemName, []map[string]interface{}{comp}, opts.outputPath, opts)
+}
+
+// newSBOMBom builds a passthrough SBOM entry for a component's boms[] array,
+// per the generalized Bom schema (ADR-0001). bomType and format are required;
+// ref carries the manifest by reference and document carries it embedded.
+func newSBOMBom(format, ref string, document map[string]interface{}) map[string]interface{} {
+	bom := map[string]interface{}{
+		"bomType": "sbom",
+		"format":  format,
+	}
+	if ref != "" {
+		bom["ref"] = ref
+	}
+	if document != nil {
+		bom["document"] = document
+	}
+	return bom
+}
+
+// ensureBOMFormat guarantees a non-empty format (schema-required on the BOM
+// entry). When the format can't be identified, it falls back to the ecosystem's
+// predominant format rather than a file extension — a generic ".json" extension
+// is not a BOM format and would leak a bogus value into the emitted document.
+func ensureBOMFormat(format string) string {
+	if format != "" {
+		return format
+	}
+	return bomFormatCycloneDX
 }
 
 // guessFormatFromURI attempts to determine SBOM format from the URI extension.
 func guessFormatFromURI(uri string) string {
 	lower := strings.ToLower(uri)
 	if strings.Contains(lower, ".cdx.") || strings.Contains(lower, "cyclonedx") {
-		return sbomFormatCycloneDX
+		return bomFormatCycloneDX
 	}
 	if strings.Contains(lower, ".spdx.") || strings.Contains(lower, "spdx") {
-		return sbomFormatSPDX
+		return bomFormatSPDX
 	}
 	return ""
 }
@@ -210,10 +397,10 @@ func runSystemCreateFromResults(results map[string]interface{}, systemName, outp
 	return writeSystemDoc(systemName, components, outputPath, opts)
 }
 
-func runSystemCreateFromSBOM(doc map[string]interface{}, filePath, systemName, componentName, outputPath, sbomFormat string, opts systemCreateOpts) error {
+func runSystemCreateFromSBOM(doc map[string]interface{}, filePath, systemName, componentName, outputPath, bomFormat string, opts systemCreateOpts) error {
 	// Extract component metadata from SBOM
 	if componentName == "" {
-		componentName = extractSBOMComponentName(doc, sbomFormat)
+		componentName = extractSBOMComponentName(doc, bomFormat)
 	}
 	if componentName == "" {
 		return fmt.Errorf("cannot determine component name from SBOM; use --component-name to specify")
@@ -224,33 +411,145 @@ func runSystemCreateFromSBOM(doc map[string]interface{}, filePath, systemName, c
 	}
 
 	// Detect component type from SBOM metadata
-	compType := extractSBOMComponentType(doc, sbomFormat)
+	compType := extractSBOMComponentType(doc, bomFormat)
 
-	comp := map[string]interface{}{
-		"name":       componentName,
-		"type":       compType,
-		"sbomRef":    filepath.ToSlash(filePath), // schema requires uri-reference; Windows backslashes are invalid
-		"sbomFormat": sbomFormat,
+	ref := filepath.ToSlash(filePath) // schema requires uri-reference; Windows backslashes are invalid
+	var embedDoc map[string]interface{}
+	if opts.embed {
+		embedDoc = doc
 	}
 
-	// Embed full SBOM data if --embed is set
-	if opts.embed {
-		comp["sbom"] = doc
+	comp := map[string]interface{}{
+		"name": componentName,
+		"type": compType,
+		"boms": []map[string]interface{}{newSBOMBom(bomFormat, ref, embedDoc)},
 	}
 
 	// Extract version if available
-	if ver := extractSBOMComponentVersion(doc, sbomFormat); ver != "" {
+	if ver := extractSBOMComponentVersion(doc, bomFormat); ver != "" {
 		comp["description"] = fmt.Sprintf("%s v%s", componentName, ver)
 	}
 
-	fmt.Fprintf(os.Stderr, "Imported %s SBOM as component %q (type: %s)\n", sbomFormat, componentName, compType)
+	fmt.Fprintf(os.Stderr, "Imported %s SBOM as component %q (type: %s)\n", bomFormat, componentName, compType)
 	return writeSystemDoc(systemName, []map[string]interface{}{comp}, outputPath, opts)
+}
+
+// runSystemCreateFromAIModelBOM builds a system document whose single component
+// is a thin aiModel component carrying the normalized ai-model BOM in boms[].
+// Unlike the SBOM path (which passes the manifest through by reference), this
+// uses the shared parser to lift the model extension (modelArchitecture etc.)
+// into a schema-valid, normalized ai-model BOM — never fabricating fields the
+// source omits.
+func runSystemCreateFromAIModelBOM(data []byte, doc map[string]interface{}, opts systemCreateOpts) error {
+	result, err := bom.ParseBom(data)
+	if err != nil {
+		return fmt.Errorf("failed to parse AI-model BOM: %w", err)
+	}
+
+	componentName := opts.componentName
+	if componentName == "" {
+		componentName = extractMLModelName(doc)
+	}
+	if componentName == "" {
+		return fmt.Errorf("cannot determine model name from AI-BOM; use --component-name to specify")
+	}
+
+	systemName := opts.systemName
+	if systemName == "" {
+		systemName = componentName + "-system"
+	}
+
+	bomMap, err := structToMap(result.Normalized)
+	if err != nil {
+		return fmt.Errorf("failed to serialize normalized AI-model BOM: %w", err)
+	}
+
+	comp := map[string]interface{}{
+		"type": compTypeAIModel,
+		"name": componentName,
+		"boms": []map[string]interface{}{bomMap},
+	}
+	if modelID := extractMLModelID(doc); modelID != "" {
+		comp["modelId"] = modelID
+	}
+	if ver := extractMLModelVersion(doc); ver != "" {
+		comp["version"] = ver
+	}
+
+	fmt.Fprintf(os.Stderr, "Imported CycloneDX ML-BOM as aiModel component %q\n", componentName)
+	return writeSystemDoc(systemName, []map[string]interface{}{comp}, opts.outputPath, opts)
+}
+
+// structToMap round-trips a value through JSON into a generic map so it can be
+// embedded in the system document's boms[] array.
+func structToMap(v interface{}) (map[string]interface{}, error) {
+	raw, err := json.Marshal(v)
+	if err != nil {
+		return nil, err
+	}
+	var out map[string]interface{}
+	if err := json.Unmarshal(raw, &out); err != nil {
+		return nil, err
+	}
+	return out, nil
+}
+
+// extractMLModelComponent returns the CycloneDX machine-learning-model component,
+// falling back to metadata.component when no dedicated model component is present.
+func extractMLModelComponent(doc map[string]interface{}) map[string]interface{} {
+	if comps, ok := doc["components"].([]interface{}); ok {
+		for _, c := range comps {
+			if cm, ok := c.(map[string]interface{}); ok && cm["type"] == "machine-learning-model" {
+				return cm
+			}
+		}
+	}
+	if meta, ok := doc["metadata"].(map[string]interface{}); ok {
+		if comp, ok := meta["component"].(map[string]interface{}); ok {
+			return comp
+		}
+	}
+	return nil
+}
+
+// extractMLModelName gets the model component's name.
+func extractMLModelName(doc map[string]interface{}) string {
+	if c := extractMLModelComponent(doc); c != nil {
+		if name, ok := c["name"].(string); ok {
+			return name
+		}
+	}
+	return ""
+}
+
+// extractMLModelID gets a provider/registry identifier for the model: the purl
+// when present, else the bom-ref.
+func extractMLModelID(doc map[string]interface{}) string {
+	if c := extractMLModelComponent(doc); c != nil {
+		if purl, ok := c["purl"].(string); ok && purl != "" {
+			return purl
+		}
+		if ref, ok := c["bom-ref"].(string); ok && ref != "" {
+			return ref
+		}
+	}
+	return ""
+}
+
+// extractMLModelVersion gets the model component's version.
+func extractMLModelVersion(doc map[string]interface{}) string {
+	if c := extractMLModelComponent(doc); c != nil {
+		if ver, ok := c["version"].(string); ok {
+			return ver
+		}
+	}
+	return ""
 }
 
 // extractSBOMComponentName gets the top-level component name from a CycloneDX or SPDX SBOM.
 func extractSBOMComponentName(doc map[string]interface{}, format string) string {
 	switch format {
-	case sbomFormatCycloneDX:
+	case bomFormatCycloneDX:
 		if meta, ok := doc["metadata"].(map[string]interface{}); ok {
 			if comp, ok := meta["component"].(map[string]interface{}); ok {
 				if name, ok := comp["name"].(string); ok {
@@ -258,7 +557,7 @@ func extractSBOMComponentName(doc map[string]interface{}, format string) string 
 				}
 			}
 		}
-	case sbomFormatSPDX:
+	case bomFormatSPDX:
 		if name, ok := doc["name"].(string); ok {
 			return name
 		}
@@ -270,7 +569,7 @@ func extractSBOMComponentName(doc map[string]interface{}, format string) string 
 // (the closed 11-value enum). CycloneDX uses a different vocabulary than
 // HDF, so we map across.
 func extractSBOMComponentType(doc map[string]interface{}, format string) string {
-	if format == sbomFormatCycloneDX {
+	if format == bomFormatCycloneDX {
 		if meta, ok := doc["metadata"].(map[string]interface{}); ok {
 			if comp, ok := meta["component"].(map[string]interface{}); ok {
 				switch comp["type"] {
@@ -289,7 +588,7 @@ func extractSBOMComponentType(doc map[string]interface{}, format string) string 
 
 // extractSBOMComponentVersion gets the version from SBOM metadata.
 func extractSBOMComponentVersion(doc map[string]interface{}, format string) string {
-	if format == sbomFormatCycloneDX {
+	if format == bomFormatCycloneDX {
 		if meta, ok := doc["metadata"].(map[string]interface{}); ok {
 			if comp, ok := meta["component"].(map[string]interface{}); ok {
 				if ver, ok := comp["version"].(string); ok {
@@ -412,15 +711,9 @@ func buildComponentFromTarget(target map[string]interface{}, baselineNames []str
 		comp["description"] = d
 	}
 
-	// Carry forward embedded SBOM
-	if sbom, ok := target["sbom"]; ok && sbom != nil {
-		comp["sbom"] = sbom
-	}
-	if sbomFmt, ok := target["sbomFormat"].(string); ok && sbomFmt != "" {
-		comp["sbomFormat"] = sbomFmt
-	}
-	if ref, ok := target["sbomRef"].(string); ok && ref != "" {
-		comp["sbomRef"] = ref
+	// Carry forward attached BOMs (SBOM, ai-model, dataset, ...)
+	if boms, ok := target["boms"]; ok && boms != nil {
+		comp["boms"] = boms
 	}
 
 	// Carry forward externalIds

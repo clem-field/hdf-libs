@@ -46,7 +46,7 @@ func TestSystemCreate_Basic(t *testing.T) {
 
 	outFile := filepath.Join(t.TempDir(), "system.json")
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"system", "create", "--from", resultsFile, "-o", outFile})
+	cmd.SetArgs([]string{"system", "create", resultsFile, "-o", outFile})
 
 	err := cmd.Execute()
 	require.NoError(t, err)
@@ -99,7 +99,7 @@ func TestSystemCreate_NameFlag(t *testing.T) {
 
 	outFile := filepath.Join(t.TempDir(), "system.json")
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"system", "create", "--from", resultsFile, "--name", "My Custom System", "-o", outFile})
+	cmd.SetArgs([]string{"system", "create", resultsFile, "--name", "My Custom System", "-o", outFile})
 
 	err := cmd.Execute()
 	require.NoError(t, err)
@@ -118,7 +118,7 @@ func TestSystemCreate_OwnerFlag(t *testing.T) { //nolint:dupl
 
 	outFile := filepath.Join(t.TempDir(), "system.json")
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"system", "create", "--from", resultsFile, "--owner", "platform-team@agency.gov", "-o", outFile})
+	cmd.SetArgs([]string{"system", "create", resultsFile, "--owner", "platform-team@agency.gov", "-o", outFile})
 
 	require.NoError(t, cmd.Execute())
 
@@ -140,7 +140,7 @@ func TestSystemCreate_OwnerPlainText(t *testing.T) { //nolint:dupl
 
 	outFile := filepath.Join(t.TempDir(), "system.json")
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"system", "create", "--from", resultsFile, "--owner", "Platform Engineering Team", "-o", outFile})
+	cmd.SetArgs([]string{"system", "create", resultsFile, "--owner", "Platform Engineering Team", "-o", outFile})
 
 	require.NoError(t, cmd.Execute())
 
@@ -162,7 +162,7 @@ func TestSystemCreate_SystemIdFlag(t *testing.T) { //nolint:dupl
 
 	outFile := filepath.Join(t.TempDir(), "system.json")
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"system", "create", "--from", resultsFile, "--system-id", "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", "-o", outFile})
+	cmd.SetArgs([]string{"system", "create", resultsFile, "--system-id", "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", "-o", outFile})
 
 	require.NoError(t, cmd.Execute())
 
@@ -180,7 +180,7 @@ func TestSystemCreate_AutoGeneratesSystemId(t *testing.T) {
 
 	outFile := filepath.Join(t.TempDir(), "system.json")
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"system", "create", "--from", resultsFile, "-o", outFile})
+	cmd.SetArgs([]string{"system", "create", resultsFile, "-o", outFile})
 
 	require.NoError(t, cmd.Execute())
 
@@ -201,7 +201,7 @@ func TestSystemCreate_DescriptionFlag(t *testing.T) { //nolint:dupl
 
 	outFile := filepath.Join(t.TempDir(), "system.json")
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"system", "create", "--from", resultsFile, "--description", "Production web application system", "-o", outFile})
+	cmd.SetArgs([]string{"system", "create", resultsFile, "--description", "Production web application system", "-o", outFile})
 
 	require.NoError(t, cmd.Execute())
 
@@ -218,25 +218,25 @@ func TestSystemCreate_Stdout(t *testing.T) {
 	require.NoError(t, os.WriteFile(resultsFile, []byte(minimalResultsJSON), 0o600))
 
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"system", "create", "--from", resultsFile})
+	cmd.SetArgs([]string{"system", "create", resultsFile})
 
 	// Should succeed (output to stdout)
 	err := cmd.Execute()
 	require.NoError(t, err)
 }
 
-func TestSystemCreate_MissingFromFlag(t *testing.T) {
+func TestSystemCreate_MissingPositional(t *testing.T) {
 	cmd := NewRootCmd()
 	cmd.SetArgs([]string{"system", "create"})
 
 	err := cmd.Execute()
 	assert.Error(t, err)
-	assert.Contains(t, err.Error(), "required")
+	assert.Contains(t, err.Error(), "arg")
 }
 
 func TestSystemCreate_MissingFile(t *testing.T) {
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"system", "create", "--from", "/nonexistent/results.json"})
+	cmd.SetArgs([]string{"system", "create", "/nonexistent/results.json"})
 
 	err := cmd.Execute()
 	assert.Error(t, err)
@@ -247,7 +247,7 @@ func TestSystemCreate_InvalidJSON(t *testing.T) {
 	require.NoError(t, os.WriteFile(resultsFile, []byte("not json"), 0o600))
 
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"system", "create", "--from", resultsFile})
+	cmd.SetArgs([]string{"system", "create", resultsFile})
 
 	err := cmd.Execute()
 	assert.Error(t, err)
@@ -265,7 +265,7 @@ func TestSystemCreate_NoTargets(t *testing.T) {
 	require.NoError(t, os.WriteFile(resultsFile, []byte(noTargets), 0o600))
 
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"system", "create", "--from", resultsFile})
+	cmd.SetArgs([]string{"system", "create", resultsFile})
 
 	err := cmd.Execute()
 	assert.Error(t, err)
@@ -286,7 +286,7 @@ func TestSystemCreate_TargetLabelsAsSelector(t *testing.T) {
 
 	outFile := filepath.Join(t.TempDir(), "system.json")
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"system", "create", "--from", resultsFile, "-o", outFile})
+	cmd.SetArgs([]string{"system", "create", resultsFile, "-o", outFile})
 
 	err := cmd.Execute()
 	require.NoError(t, err)
@@ -317,7 +317,7 @@ func TestSystemCreate_FromCycloneDXSBOM(t *testing.T) {
 	outFile := filepath.Join(t.TempDir(), "system.json")
 
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"system", "create", "--from", sbomFile, "-o", outFile})
+	cmd.SetArgs([]string{"system", "create", sbomFile, "-o", outFile})
 
 	err := cmd.Execute()
 	require.NoError(t, err)
@@ -334,8 +334,12 @@ func TestSystemCreate_FromCycloneDXSBOM(t *testing.T) {
 	c0 := components[0].(map[string]interface{})
 	assert.Equal(t, "juice-shop", c0["name"])
 	assert.Equal(t, "application", c0["type"])
-	assert.Equal(t, "cyclonedx", c0["sbomFormat"])
-	assert.Contains(t, c0["sbomRef"], "juice-shop-sbom-minimal.json")
+	boms := c0["boms"].([]interface{})
+	require.Len(t, boms, 1)
+	bom0 := boms[0].(map[string]interface{})
+	assert.Equal(t, "sbom", bom0["bomType"])
+	assert.Equal(t, "cyclonedx", bom0["format"])
+	assert.Contains(t, bom0["ref"], "juice-shop-sbom-minimal.json")
 	assert.Contains(t, c0["description"].(string), "19.1.1") // version extracted
 }
 
@@ -343,7 +347,7 @@ func TestSystemCreate_FromSBOM_RequiresComponentNameWhenNoMetadata(t *testing.T)
 	sbomFile := converterFixturePath(t, "cyclonedx-to-hdf", "input/spdx-to-cyclonedx.json")
 
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"system", "create", "--from", sbomFile})
+	cmd.SetArgs([]string{"system", "create", sbomFile})
 
 	err := cmd.Execute()
 	require.Error(t, err)
@@ -355,7 +359,7 @@ func TestSystemCreate_FromSBOM_WithExplicitComponentName(t *testing.T) {
 	outFile := filepath.Join(t.TempDir(), "system.json")
 
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"system", "create", "--from", sbomFile, "--component-name", "MyLib", "-o", outFile})
+	cmd.SetArgs([]string{"system", "create", sbomFile, "--component-name", "MyLib", "-o", outFile})
 
 	err := cmd.Execute()
 	require.NoError(t, err)
@@ -372,7 +376,7 @@ func TestSystemCreate_FromSBOM_WithExplicitComponentName(t *testing.T) {
 
 func TestSystemCreate_FromURL_RequiresComponentName(t *testing.T) {
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"system", "create", "--from", "https://example.com/sbom.cdx.json"})
+	cmd.SetArgs([]string{"system", "create", "https://example.com/sbom.cdx.json"})
 
 	err := cmd.Execute()
 	require.Error(t, err)
@@ -384,7 +388,7 @@ func TestSystemCreate_FromURL_WithComponentName(t *testing.T) {
 	outFile := filepath.Join(t.TempDir(), "system.json")
 
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"system", "create", "--from", "https://artifacts.example.com/sbom/webtier.cdx.json", "--component-name", "WebTier", "-o", outFile})
+	cmd.SetArgs([]string{"system", "create", "https://artifacts.example.com/sbom/webtier.cdx.json", "--component-name", "WebTier", "-o", outFile})
 
 	err := cmd.Execute()
 	require.NoError(t, err)
@@ -397,8 +401,342 @@ func TestSystemCreate_FromURL_WithComponentName(t *testing.T) {
 	components := sys["components"].([]interface{})
 	c0 := components[0].(map[string]interface{})
 	assert.Equal(t, "WebTier", c0["name"])
-	assert.Equal(t, "https://artifacts.example.com/sbom/webtier.cdx.json", c0["sbomRef"])
-	assert.Equal(t, "cyclonedx", c0["sbomFormat"]) // guessed from .cdx.json
+	boms := c0["boms"].([]interface{})
+	require.Len(t, boms, 1)
+	bom0 := boms[0].(map[string]interface{})
+	assert.Equal(t, "sbom", bom0["bomType"])
+	assert.Equal(t, "https://artifacts.example.com/sbom/webtier.cdx.json", bom0["ref"])
+	assert.Equal(t, "cyclonedx", bom0["format"]) // guessed from .cdx.json
+}
+
+// URL inputs route through runSystemCreateFromSBOMRef, which must still honor
+// the system-level flags (they were silently dropped before).
+func TestSystemCreate_FromURL_HonorsSystemFlags(t *testing.T) {
+	outFile := filepath.Join(t.TempDir(), "system.json")
+
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"system", "create", "https://artifacts.example.com/sbom/webtier.cdx.json",
+		"--component-name", "WebTier",
+		"--owner", "team@agency.gov",
+		"--description", "Prod web tier",
+		"--system-id", "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee",
+		"--generate-component-id",
+		"-o", outFile})
+	require.NoError(t, cmd.Execute())
+
+	data, err := os.ReadFile(outFile)
+	require.NoError(t, err)
+	var sys map[string]interface{}
+	require.NoError(t, json.Unmarshal(data, &sys))
+
+	assert.Equal(t, "aaaaaaaa-bbbb-cccc-dddd-eeeeeeeeeeee", sys["systemId"])
+	assert.Equal(t, "Prod web tier", sys["description"])
+	owner, ok := sys["owner"].(map[string]interface{})
+	require.True(t, ok, "owner should be present")
+	assert.Equal(t, "team@agency.gov", owner["identifier"])
+
+	c0 := sys["components"].([]interface{})[0].(map[string]interface{})
+	id, ok := c0["componentId"].(string)
+	assert.True(t, ok, "component should have a generated componentId")
+	assert.Len(t, id, 36)
+}
+
+// --embed cannot embed content that is never fetched, so a URL + --embed errors.
+func TestSystemCreate_FromURL_EmbedRejected(t *testing.T) {
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"system", "create", "https://artifacts.example.com/sbom/webtier.cdx.json",
+		"--component-name", "WebTier", "--embed"})
+	err := cmd.Execute()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "embed")
+	assert.Contains(t, err.Error(), "URL")
+}
+
+// A URL with no format hint keeps a defaulted format (schema-required).
+func TestSystemCreate_FromURL_DefaultsFormatNoHint(t *testing.T) {
+	outFile := filepath.Join(t.TempDir(), "system.json")
+
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"system", "create", "https://artifacts.example.com/sbom/blob", "--component-name", "Blob", "-o", outFile})
+	require.NoError(t, cmd.Execute())
+
+	data, err := os.ReadFile(outFile)
+	require.NoError(t, err)
+	var sys map[string]interface{}
+	require.NoError(t, json.Unmarshal(data, &sys))
+
+	c0 := sys["components"].([]interface{})[0].(map[string]interface{})
+	bom0 := c0["boms"].([]interface{})[0].(map[string]interface{})
+	assert.Equal(t, "cyclonedx", bom0["format"]) // defaulted when the URL gives no hint
+}
+
+// Oversized input must be rejected by the size gate before it is fully parsed.
+func TestSystemCreate_OversizedInputRejected(t *testing.T) {
+	big := make([]byte, 2*1024*1024)
+	for i := range big {
+		big[i] = 'a'
+	}
+	f := filepath.Join(t.TempDir(), "big.json")
+	require.NoError(t, os.WriteFile(f, big, 0o600))
+
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"system", "create", f, "--max-size", "1"})
+	err := cmd.Execute()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "exceeds maximum allowed size")
+}
+
+// ---- AI-model BOM input tests ----
+
+func TestSystemCreate_FromAIModelBOM(t *testing.T) {
+	bomFile := bomFixturePath(t, "cyclonedx-mlbom.json")
+	outFile := filepath.Join(t.TempDir(), "system.json")
+
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"system", "create", bomFile, "-o", outFile})
+
+	err := cmd.Execute()
+	require.NoError(t, err)
+
+	data, err := os.ReadFile(outFile)
+	require.NoError(t, err)
+
+	var sys map[string]interface{}
+	require.NoError(t, json.Unmarshal(data, &sys))
+
+	components := sys["components"].([]interface{})
+	require.Len(t, components, 1)
+	c0 := components[0].(map[string]interface{})
+	assert.Equal(t, "aiModel", c0["type"])
+	assert.Equal(t, "stable-diffusion", c0["name"])
+	assert.Equal(t, "1.4", c0["version"])
+	assert.Equal(t, "component-a", c0["modelId"]) // bom-ref (no purl in fixture)
+
+	boms := c0["boms"].([]interface{})
+	require.Len(t, boms, 1)
+	bom0 := boms[0].(map[string]interface{})
+	assert.Equal(t, "ai-model", bom0["bomType"])
+	assert.Equal(t, "cyclonedx-ml", bom0["format"])
+
+	model := bom0["model"].(map[string]interface{})
+	assert.Equal(t, "The architecture of the model.", model["modelArchitecture"])
+	// Partial-fidelity: never fabricated.
+	_, hasParamCount := model["parameterCount"]
+	assert.False(t, hasParamCount)
+	_, hasSerFmt := model["serializationFormat"]
+	assert.False(t, hasSerFmt)
+}
+
+func TestSystemCreate_FromAIModelBOM_Sparse(t *testing.T) {
+	bomFile := bomFixturePath(t, "cyclonedx-mlbom-sparse.json")
+	outFile := filepath.Join(t.TempDir(), "system.json")
+
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"system", "create", bomFile, "-o", outFile})
+
+	err := cmd.Execute()
+	require.NoError(t, err)
+
+	data, err := os.ReadFile(outFile)
+	require.NoError(t, err)
+
+	var sys map[string]interface{}
+	require.NoError(t, json.Unmarshal(data, &sys))
+
+	c0 := sys["components"].([]interface{})[0].(map[string]interface{})
+	assert.Equal(t, "aiModel", c0["type"])
+	assert.Equal(t, "stable-diffusion", c0["name"])
+
+	bom0 := c0["boms"].([]interface{})[0].(map[string]interface{})
+	assert.Equal(t, "ai-model", bom0["bomType"])
+	assert.Equal(t, "cyclonedx-ml", bom0["format"])
+
+	// Partial-fidelity: the model extension is minimal/empty and NEVER carries
+	// fabricated fields.
+	if model, ok := bom0["model"].(map[string]interface{}); ok {
+		assert.Empty(t, model)
+		_, hasArch := model["modelArchitecture"]
+		assert.False(t, hasArch)
+		_, hasParamCount := model["parameterCount"]
+		assert.False(t, hasParamCount)
+	}
+}
+
+func TestSystemCreate_FromAIModelBOM_ComponentNameOverride(t *testing.T) {
+	bomFile := bomFixturePath(t, "cyclonedx-mlbom.json")
+	outFile := filepath.Join(t.TempDir(), "system.json")
+
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"system", "create", bomFile, "--component-name", "MyModel", "-o", outFile})
+
+	err := cmd.Execute()
+	require.NoError(t, err)
+
+	data, err := os.ReadFile(outFile)
+	require.NoError(t, err)
+
+	var sys map[string]interface{}
+	require.NoError(t, json.Unmarshal(data, &sys))
+	c0 := sys["components"].([]interface{})[0].(map[string]interface{})
+	assert.Equal(t, "MyModel", c0["name"])
+	assert.Equal(t, "aiModel", c0["type"])
+}
+
+// componentsByType groups a system document's components by their type value.
+func componentsByType(t *testing.T, sys map[string]interface{}) map[string][]map[string]interface{} {
+	t.Helper()
+	out := map[string][]map[string]interface{}{}
+	for _, c := range sys["components"].([]interface{}) {
+		comp := c.(map[string]interface{})
+		typ, _ := comp["type"].(string)
+		out[typ] = append(out[typ], comp)
+	}
+	return out
+}
+
+func TestSystemCreate_FromSPDX3AIBOM(t *testing.T) {
+	bomFile := bomFixturePath(t, "spdx-ai-model-1.json")
+	outFile := filepath.Join(t.TempDir(), "system.json")
+
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"system", "create", bomFile, "-o", outFile})
+	require.NoError(t, cmd.Execute())
+
+	data, err := os.ReadFile(outFile)
+	require.NoError(t, err)
+	var sys map[string]interface{}
+	require.NoError(t, json.Unmarshal(data, &sys))
+
+	byType := componentsByType(t, sys)
+	require.Len(t, byType["aiModel"], 2)
+	require.Len(t, byType["dataset"], 1)
+
+	// Every emitted component carries exactly one spdx-3-ai BOM.
+	for _, comp := range sys["components"].([]interface{}) {
+		boms := comp.(map[string]interface{})["boms"].([]interface{})
+		require.Len(t, boms, 1)
+		assert.Equal(t, "spdx-3-ai", boms[0].(map[string]interface{})["format"])
+	}
+
+	model0 := byType["aiModel"][0]
+	assert.NotEmpty(t, model0["modelId"])
+	assert.Equal(t, "ai-model", model0["boms"].([]interface{})[0].(map[string]interface{})["bomType"])
+
+	ds0 := byType["dataset"][0]
+	assert.NotEmpty(t, ds0["datasetId"])
+	assert.Equal(t, "dataset", ds0["boms"].([]interface{})[0].(map[string]interface{})["bomType"])
+
+	// writeSystemDoc validates against the bundled schema before writing, so a
+	// successful write already proves schema-validity; assert it explicitly too.
+	require.NoError(t, validateHDFOutput(data))
+}
+
+func TestSystemCreate_FromSPDX3AIBOM_DatasetOnly(t *testing.T) {
+	bomFile := bomFixturePath(t, "spdx-ai-dataset-1.json")
+	outFile := filepath.Join(t.TempDir(), "system.json")
+
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"system", "create", bomFile, "-o", outFile})
+	require.NoError(t, cmd.Execute())
+
+	data, err := os.ReadFile(outFile)
+	require.NoError(t, err)
+	var sys map[string]interface{}
+	require.NoError(t, json.Unmarshal(data, &sys))
+
+	byType := componentsByType(t, sys)
+	assert.Empty(t, byType["aiModel"])
+	require.Len(t, byType["dataset"], 1)
+	require.NoError(t, validateHDFOutput(data))
+}
+
+// ---- --from format-assertion tests (system create) ----
+
+func TestSystemCreate_FromFormat_MLBOMMatch(t *testing.T) {
+	bomFile := bomFixturePath(t, "cyclonedx-mlbom.json")
+	outFile := filepath.Join(t.TempDir(), "system.json")
+
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"system", "create", bomFile, "--from", "cyclonedx-mlbom", "-o", outFile})
+	require.NoError(t, cmd.Execute())
+
+	data, err := os.ReadFile(outFile)
+	require.NoError(t, err)
+	var sys map[string]interface{}
+	require.NoError(t, json.Unmarshal(data, &sys))
+	c0 := sys["components"].([]interface{})[0].(map[string]interface{})
+	assert.Equal(t, "aiModel", c0["type"])
+}
+
+func TestSystemCreate_FromFormat_MLBOMMismatch(t *testing.T) {
+	sbomFile := bomFixturePath(t, "cyclonedx-sbom.json")
+
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"system", "create", sbomFile, "--from", "cyclonedx-mlbom"})
+	err := cmd.Execute()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "detected as")
+	assert.Contains(t, err.Error(), "cyclonedx-mlbom")
+}
+
+func TestSystemCreate_FromFormat_SPDXAIMatch(t *testing.T) {
+	bomFile := bomFixturePath(t, "spdx-ai-model-1.json")
+	outFile := filepath.Join(t.TempDir(), "system.json")
+
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"system", "create", bomFile, "--from", "spdx-ai", "-o", outFile})
+	require.NoError(t, cmd.Execute())
+}
+
+func TestSystemCreate_FromFormat_CycloneDXMatch(t *testing.T) {
+	sbomFile := bomFixturePath(t, "cyclonedx-sbom.json")
+	outFile := filepath.Join(t.TempDir(), "system.json")
+
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"system", "create", sbomFile, "--from", "cyclonedx", "-o", outFile})
+	require.NoError(t, cmd.Execute())
+}
+
+func TestSystemCreate_FromFormat_CycloneDXRejectsMLBOM(t *testing.T) {
+	bomFile := bomFixturePath(t, "cyclonedx-mlbom.json")
+
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"system", "create", bomFile, "--from", "cyclonedx"})
+	err := cmd.Execute()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "detected as")
+}
+
+// --from spdx on a CycloneDX SBOM is a format mismatch (specific-format assertion).
+func TestSystemCreate_FromFormat_SPDXMismatch(t *testing.T) {
+	sbomFile := bomFixturePath(t, "cyclonedx-sbom.json")
+
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"system", "create", sbomFile, "--from", "spdx"})
+	err := cmd.Execute()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "detected as")
+}
+
+func TestSystemCreate_FromFormat_Unknown(t *testing.T) {
+	sbomFile := bomFixturePath(t, "cyclonedx-sbom.json")
+
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"system", "create", sbomFile, "--from", "bogus"})
+	err := cmd.Execute()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "unknown --from format")
+	assert.Contains(t, err.Error(), "cyclonedx-mlbom")
+}
+
+// A URL input can't be fetched to verify its format, so --from must be rejected
+// rather than blindly asserted (which could mislabel a remote BOM).
+func TestSystemCreate_FromFormat_URLRejected(t *testing.T) {
+	cmd := NewRootCmd()
+	cmd.SetArgs([]string{"system", "create", "https://artifacts.example.com/sbom/webtier.cdx.json", "--from", "cyclonedx-mlbom", "--component-name", "WebTier"})
+	err := cmd.Execute()
+	require.Error(t, err)
+	assert.Contains(t, err.Error(), "URL")
 }
 
 func TestSystemAddComponent(t *testing.T) {
@@ -408,13 +746,13 @@ func TestSystemAddComponent(t *testing.T) {
 	sysFile := filepath.Join(t.TempDir(), "system.json")
 
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"system", "create", "--from", resultsFile, "-o", sysFile})
+	cmd.SetArgs([]string{"system", "create", resultsFile, "-o", sysFile})
 	require.NoError(t, cmd.Execute())
 
 	// Add component from SBOM
 	sbomFile := converterFixturePath(t, "cyclonedx-to-hdf", "input/webgoat-sbom.json")
 	cmd2 := NewRootCmd()
-	cmd2.SetArgs([]string{"system", "add-component", "--system", sysFile, "--from", sbomFile, "--component-name", "WebGoat"})
+	cmd2.SetArgs([]string{"system", "add-component", sbomFile, "--system", sysFile, "--component-name", "WebGoat"})
 	require.NoError(t, cmd2.Execute())
 
 	data, err := os.ReadFile(sysFile)
@@ -426,7 +764,9 @@ func TestSystemAddComponent(t *testing.T) {
 	assert.Len(t, components, 3) // 2 from results + 1 from SBOM
 	last := components[2].(map[string]interface{})
 	assert.Equal(t, "WebGoat", last["name"])
-	assert.Equal(t, "cyclonedx", last["sbomFormat"])
+	boms := last["boms"].([]interface{})
+	require.Len(t, boms, 1)
+	assert.Equal(t, "cyclonedx", boms[0].(map[string]interface{})["format"])
 }
 
 func TestSystemAddComponent_RejectsDuplicate(t *testing.T) {
@@ -435,12 +775,12 @@ func TestSystemAddComponent_RejectsDuplicate(t *testing.T) {
 	sysFile := filepath.Join(t.TempDir(), "system.json")
 
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"system", "create", "--from", sbomFile, "-o", sysFile})
+	cmd.SetArgs([]string{"system", "create", sbomFile, "-o", sysFile})
 	require.NoError(t, cmd.Execute())
 
 	// Try adding same component name
 	cmd2 := NewRootCmd()
-	cmd2.SetArgs([]string{"system", "add-component", "--system", sysFile, "--from", sbomFile})
+	cmd2.SetArgs([]string{"system", "add-component", sbomFile, "--system", sysFile})
 	err := cmd2.Execute()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "already exists")
@@ -452,13 +792,13 @@ func TestSystemUpdateComponent(t *testing.T) {
 	sysFile := filepath.Join(t.TempDir(), "system.json")
 
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"system", "create", "--from", sbomFile, "-o", sysFile})
+	cmd.SetArgs([]string{"system", "create", sbomFile, "-o", sysFile})
 	require.NoError(t, cmd.Execute())
 
 	// Update with webgoat SBOM (different file, same component name)
 	webgoatFile := converterFixturePath(t, "cyclonedx-to-hdf", "input/webgoat-sbom.json")
 	cmd2 := NewRootCmd()
-	cmd2.SetArgs([]string{"system", "update-component", "--system", sysFile, "--component-name", "juice-shop", "--from", webgoatFile})
+	cmd2.SetArgs([]string{"system", "update-component", webgoatFile, "--system", sysFile, "--component-name", "juice-shop"})
 	require.NoError(t, cmd2.Execute())
 
 	data, err := os.ReadFile(sysFile)
@@ -469,7 +809,9 @@ func TestSystemUpdateComponent(t *testing.T) {
 	components := sys["components"].([]interface{})
 	assert.Len(t, components, 1) // still one component
 	c0 := components[0].(map[string]interface{})
-	assert.Contains(t, c0["sbomRef"], "webgoat-sbom.json") // updated ref
+	boms := c0["boms"].([]interface{})
+	require.Len(t, boms, 1)
+	assert.Contains(t, boms[0].(map[string]interface{})["ref"], "webgoat-sbom.json") // updated ref
 }
 
 func TestSystemUpdateComponent_RejectsNonexistent(t *testing.T) {
@@ -477,11 +819,11 @@ func TestSystemUpdateComponent_RejectsNonexistent(t *testing.T) {
 	sysFile := filepath.Join(t.TempDir(), "system.json")
 
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"system", "create", "--from", sbomFile, "-o", sysFile})
+	cmd.SetArgs([]string{"system", "create", sbomFile, "-o", sysFile})
 	require.NoError(t, cmd.Execute())
 
 	cmd2 := NewRootCmd()
-	cmd2.SetArgs([]string{"system", "update-component", "--system", sysFile, "--component-name", "DoesNotExist", "--from", sbomFile})
+	cmd2.SetArgs([]string{"system", "update-component", sbomFile, "--system", sysFile, "--component-name", "DoesNotExist"})
 	err := cmd2.Execute()
 	require.Error(t, err)
 	assert.Contains(t, err.Error(), "not found")
@@ -495,7 +837,7 @@ func TestSystemCreate_GenerateComponentId(t *testing.T) {
 
 	outFile := filepath.Join(t.TempDir(), "system.json")
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"system", "create", "--from", resultsFile, "--generate-component-id", "-o", outFile})
+	cmd.SetArgs([]string{"system", "create", resultsFile, "--generate-component-id", "-o", outFile})
 	require.NoError(t, cmd.Execute())
 
 	data, err := os.ReadFile(outFile)
@@ -524,7 +866,7 @@ func TestSystemCreate_GenerateComponentId_SBOM(t *testing.T) {
 	outFile := filepath.Join(t.TempDir(), "system.json")
 
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"system", "create", "--from", sbomFile, "--generate-component-id", "-o", outFile})
+	cmd.SetArgs([]string{"system", "create", sbomFile, "--generate-component-id", "-o", outFile})
 	require.NoError(t, cmd.Execute())
 
 	data, err := os.ReadFile(outFile)
@@ -546,7 +888,7 @@ func TestSystemCreate_NoGenerateComponentId(t *testing.T) {
 
 	outFile := filepath.Join(t.TempDir(), "system.json")
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"system", "create", "--from", resultsFile, "-o", outFile})
+	cmd.SetArgs([]string{"system", "create", resultsFile, "-o", outFile})
 	require.NoError(t, cmd.Execute())
 
 	data, err := os.ReadFile(outFile)
@@ -569,12 +911,12 @@ func TestSystemAddComponent_GenerateComponentId(t *testing.T) {
 	sysFile := filepath.Join(t.TempDir(), "system.json")
 
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"system", "create", "--from", resultsFile, "-o", sysFile})
+	cmd.SetArgs([]string{"system", "create", resultsFile, "-o", sysFile})
 	require.NoError(t, cmd.Execute())
 
 	sbomFile := converterFixturePath(t, "cyclonedx-to-hdf", "input/webgoat-sbom.json")
 	cmd2 := NewRootCmd()
-	cmd2.SetArgs([]string{"system", "add-component", "--system", sysFile, "--from", sbomFile, "--component-name", "WebGoat", "--generate-component-id"})
+	cmd2.SetArgs([]string{"system", "add-component", sbomFile, "--system", sysFile, "--component-name", "WebGoat", "--generate-component-id"})
 	require.NoError(t, cmd2.Execute())
 
 	data, err := os.ReadFile(sysFile)
@@ -596,7 +938,7 @@ func TestSystemCreate_FromSBOM_Embed(t *testing.T) {
 	outFile := filepath.Join(t.TempDir(), "system.json")
 
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"system", "create", "--from", sbomFile, "--embed", "-o", outFile})
+	cmd.SetArgs([]string{"system", "create", sbomFile, "--embed", "-o", outFile})
 	require.NoError(t, cmd.Execute())
 
 	data, err := os.ReadFile(outFile)
@@ -608,13 +950,17 @@ func TestSystemCreate_FromSBOM_Embed(t *testing.T) {
 	components := sys["components"].([]interface{})
 	c0 := components[0].(map[string]interface{})
 
-	// sbom field should contain the full SBOM object
-	sbom, ok := c0["sbom"].(map[string]interface{})
-	require.True(t, ok, "expected sbom to be embedded object, got %T", c0["sbom"])
-	assert.Equal(t, "CycloneDX", sbom["bomFormat"])
+	boms := c0["boms"].([]interface{})
+	require.Len(t, boms, 1)
+	bom0 := boms[0].(map[string]interface{})
 
-	// sbomRef should still be present for traceability
-	assert.Contains(t, c0["sbomRef"], "juice-shop-sbom-minimal.json")
+	// document should contain the full SBOM object
+	doc, ok := bom0["document"].(map[string]interface{})
+	require.True(t, ok, "expected document to be embedded object, got %T", bom0["document"])
+	assert.Equal(t, "CycloneDX", doc["bomFormat"])
+
+	// ref should still be present for traceability
+	assert.Contains(t, bom0["ref"], "juice-shop-sbom-minimal.json")
 }
 
 func TestSystemCreate_FromSBOM_NoEmbed(t *testing.T) {
@@ -622,7 +968,7 @@ func TestSystemCreate_FromSBOM_NoEmbed(t *testing.T) {
 	outFile := filepath.Join(t.TempDir(), "system.json")
 
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"system", "create", "--from", sbomFile, "-o", outFile})
+	cmd.SetArgs([]string{"system", "create", sbomFile, "-o", outFile})
 	require.NoError(t, cmd.Execute())
 
 	data, err := os.ReadFile(outFile)
@@ -634,10 +980,14 @@ func TestSystemCreate_FromSBOM_NoEmbed(t *testing.T) {
 	components := sys["components"].([]interface{})
 	c0 := components[0].(map[string]interface{})
 
-	// Without --embed, sbom should NOT be present
-	assert.Nil(t, c0["sbom"], "sbom should not be embedded without --embed")
-	// sbomRef should be present
-	assert.Contains(t, c0["sbomRef"], "juice-shop-sbom-minimal.json")
+	boms := c0["boms"].([]interface{})
+	require.Len(t, boms, 1)
+	bom0 := boms[0].(map[string]interface{})
+
+	// Without --embed, document should NOT be present
+	assert.Nil(t, bom0["document"], "document should not be embedded without --embed")
+	// ref should be present
+	assert.Contains(t, bom0["ref"], "juice-shop-sbom-minimal.json")
 }
 
 func TestSystemAddComponent_Embed(t *testing.T) {
@@ -647,13 +997,13 @@ func TestSystemAddComponent_Embed(t *testing.T) {
 	sysFile := filepath.Join(t.TempDir(), "system.json")
 
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"system", "create", "--from", resultsFile, "-o", sysFile})
+	cmd.SetArgs([]string{"system", "create", resultsFile, "-o", sysFile})
 	require.NoError(t, cmd.Execute())
 
 	// Add component with --embed
 	sbomFile := converterFixturePath(t, "cyclonedx-to-hdf", "input/webgoat-sbom.json")
 	cmd2 := NewRootCmd()
-	cmd2.SetArgs([]string{"system", "add-component", "--system", sysFile, "--from", sbomFile, "--component-name", "WebGoat", "--embed"})
+	cmd2.SetArgs([]string{"system", "add-component", sbomFile, "--system", sysFile, "--component-name", "WebGoat", "--embed"})
 	require.NoError(t, cmd2.Execute())
 
 	data, err := os.ReadFile(sysFile)
@@ -665,10 +1015,12 @@ func TestSystemAddComponent_Embed(t *testing.T) {
 	last := components[len(components)-1].(map[string]interface{})
 	assert.Equal(t, "WebGoat", last["name"])
 
-	// sbom should be embedded
-	sbom, ok := last["sbom"].(map[string]interface{})
-	require.True(t, ok, "expected sbom to be embedded")
-	assert.Equal(t, "CycloneDX", sbom["bomFormat"])
+	// document should be embedded
+	boms := last["boms"].([]interface{})
+	require.Len(t, boms, 1)
+	doc, ok := boms[0].(map[string]interface{})["document"].(map[string]interface{})
+	require.True(t, ok, "expected document to be embedded")
+	assert.Equal(t, "CycloneDX", doc["bomFormat"])
 }
 
 func TestSystemUpdateComponent_Embed(t *testing.T) {
@@ -677,13 +1029,13 @@ func TestSystemUpdateComponent_Embed(t *testing.T) {
 	sysFile := filepath.Join(t.TempDir(), "system.json")
 
 	cmd := NewRootCmd()
-	cmd.SetArgs([]string{"system", "create", "--from", sbomFile, "-o", sysFile})
+	cmd.SetArgs([]string{"system", "create", sbomFile, "-o", sysFile})
 	require.NoError(t, cmd.Execute())
 
 	// Update with --embed
 	webgoatFile := converterFixturePath(t, "cyclonedx-to-hdf", "input/webgoat-sbom.json")
 	cmd2 := NewRootCmd()
-	cmd2.SetArgs([]string{"system", "update-component", "--system", sysFile, "--component-name", "juice-shop", "--from", webgoatFile, "--embed"})
+	cmd2.SetArgs([]string{"system", "update-component", webgoatFile, "--system", sysFile, "--component-name", "juice-shop", "--embed"})
 	require.NoError(t, cmd2.Execute())
 
 	data, err := os.ReadFile(sysFile)
@@ -694,11 +1046,14 @@ func TestSystemUpdateComponent_Embed(t *testing.T) {
 	components := sys["components"].([]interface{})
 	c0 := components[0].(map[string]interface{})
 
-	// sbom should be the webgoat SBOM (not juice-shop)
-	sbom, ok := c0["sbom"].(map[string]interface{})
-	require.True(t, ok, "expected sbom to be embedded after update")
-	assert.Contains(t, c0["sbomRef"], "webgoat-sbom.json")
-	assert.NotNil(t, sbom["bomFormat"])
+	// document should be the webgoat SBOM (not juice-shop)
+	boms := c0["boms"].([]interface{})
+	require.Len(t, boms, 1)
+	bom0 := boms[0].(map[string]interface{})
+	doc, ok := bom0["document"].(map[string]interface{})
+	require.True(t, ok, "expected document to be embedded after update")
+	assert.Contains(t, bom0["ref"], "webgoat-sbom.json")
+	assert.NotNil(t, doc["bomFormat"])
 }
 
 func TestSystemCreate_TypeMapping(t *testing.T) {
@@ -735,7 +1090,7 @@ func TestSystemCreate_TypeMapping(t *testing.T) {
 
 			outFile := filepath.Join(t.TempDir(), "system.json")
 			cmd := NewRootCmd()
-			cmd.SetArgs([]string{"system", "create", "--from", resultsFile, "-o", outFile})
+			cmd.SetArgs([]string{"system", "create", resultsFile, "-o", outFile})
 
 			err := cmd.Execute()
 			require.NoError(t, err)
