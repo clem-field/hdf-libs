@@ -200,3 +200,90 @@ func TestStripProductsLineRemovesTail(t *testing.T) {
 	assert.Equal(t, "prose", stripProductsLine("prose\nProducts: A, B"))
 	assert.Equal(t, "only prose", stripProductsLine("only prose"))
 }
+
+func TestConvertHDFToCSAFVEX_CvssScore(t *testing.T) {
+	t.Parallel()
+	input := []byte(`{"overrides":[{
+		"type":"falsePositive","requirementId":"CVE-2021-44228","status":"notApplicable","reason":"not reachable",
+		"componentRef":"pkg:maven/log4j@2.14.1",
+		"appliedBy":{"type":"simple","identifier":"a"},"appliedAt":"2026-01-01T00:00:00Z",
+		"cvss":{"version":"3.1","baseVector":"CVSS:3.1/AV:N/AC:L/PR:N/UI:N/S:U/C:H/I:H/A:H","baseScore":10,"baseSeverity":"critical"}
+	}]}`)
+	out, err := ConvertHDFToCSAFVEX(input, testVersion)
+	require.NoError(t, err)
+	var doc CSAFVexDocument
+	require.NoError(t, json.Unmarshal(out, &doc))
+	require.Len(t, doc.Vulnerabilities, 1)
+	v := doc.Vulnerabilities[0]
+	require.NotEmpty(t, v.Scores)
+	require.NotNil(t, v.Scores[0].CvssV3)
+	assert.Equal(t, "3.1", v.Scores[0].CvssV3.Version)
+	require.NotNil(t, v.Scores[0].CvssV3.BaseScore)
+	assert.InDelta(t, 10.0, *v.Scores[0].CvssV3.BaseScore, 0.001)
+	assert.Contains(t, v.Scores[0].CvssV3.VectorString, "CVSS:3.1")
+	assert.NotEmpty(t, v.Scores[0].Products)
+}
+
+func TestConvertHDFToCSAFVEX_FixedInVersionExport(t *testing.T) {
+	t.Parallel()
+	input := []byte(`{
+		"name": "fixedInVersion",
+		"overrides": [{
+			"type": "falsePositive",
+			"requirementId": "CVE-2026-9999",
+			"status": "passed",
+			"appliedAt": "2026-01-01T00:00:00Z",
+			"expiresAt": "2099-12-31T00:00:00Z",
+			"appliedBy": {"type": "simple", "identifier": "team"},
+			"reason": "patched upstream",
+			"affectedPackages": [{"name": "abc", "version": "4.2", "purl": "pkg:npm/abc@4.2", "fixedInVersion": "4.5"}]
+		}]
+	}`)
+	out, err := ConvertHDFToCSAFVEX(input, testVersion)
+	require.NoError(t, err)
+
+	var doc CSAFVexDocument
+	require.NoError(t, json.Unmarshal(out, &doc))
+	require.Len(t, doc.Vulnerabilities, 1)
+	v := doc.Vulnerabilities[0]
+	require.NotNil(t, v.ProductStatus)
+	assert.Contains(t, v.ProductStatus.FirstFixed, "pkg:npm/abc@4.5")
+	assert.Contains(t, v.ProductStatus.Fixed, "pkg:npm/abc@4.5")
+
+	var found bool
+	for _, r := range v.Remediations {
+		if r.Category == "vendor_fix" && r.Details == "Fixed in 4.5" {
+			assert.Equal(t, []string{"pkg:npm/abc@4.5"}, r.ProductIDs)
+			found = true
+		}
+	}
+	assert.True(t, found, "expected a vendor_fix remediation for the fixed version")
+
+	var ids []string
+	for _, p := range doc.ProductTree.FullProductNames {
+		ids = append(ids, p.ProductID)
+	}
+	assert.Contains(t, ids, "pkg:npm/abc@4.5")
+}
+
+func TestConvertHDFToCSAFVEX_ProductTreeGloballySorted(t *testing.T) {
+	t.Parallel()
+	// product_tree ids must be globally sorted (parity with the TS exporter),
+	// even when alphabetical order differs from CVE/group insertion order.
+	input := []byte(`{
+		"name": "ordering",
+		"overrides": [
+			{"type":"falsePositive","requirementId":"CVE-2026-0001","status":"passed","appliedAt":"2026-01-01T00:00:00Z","expiresAt":"2099-12-31T00:00:00Z","appliedBy":{"type":"simple","identifier":"team"},"reason":"x","affectedPackages":[{"purl":"pkg:npm/zzz@1.0"}]},
+			{"type":"falsePositive","requirementId":"CVE-2026-0002","status":"passed","appliedAt":"2026-01-01T00:00:00Z","expiresAt":"2099-12-31T00:00:00Z","appliedBy":{"type":"simple","identifier":"team"},"reason":"x","affectedPackages":[{"purl":"pkg:npm/aaa@1.0"}]}
+		]
+	}`)
+	out, err := ConvertHDFToCSAFVEX(input, testVersion)
+	require.NoError(t, err)
+	var doc CSAFVexDocument
+	require.NoError(t, json.Unmarshal(out, &doc))
+	var ids []string
+	for _, p := range doc.ProductTree.FullProductNames {
+		ids = append(ids, p.ProductID)
+	}
+	assert.Equal(t, []string{"pkg:npm/aaa@1.0", "pkg:npm/zzz@1.0"}, ids)
+}
