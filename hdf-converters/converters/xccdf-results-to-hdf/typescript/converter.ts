@@ -128,7 +128,7 @@ interface RuleElement {
   version?: string | VersionElement;
   fixtext?: string | FixtextElement;
   ident?: IdentElement[];
-  check?: CheckElement;
+  check?: CheckElement | CheckElement[];
 }
 
 interface CheckElement {
@@ -305,7 +305,11 @@ export async function convertXccdfResultsToHdf(input: string, converterVersion =
   }
   validateInputSize(input, 'xccdf-results');
 
-  const parsed = parseXmlWithArrays(input, ARRAY_TAGS);
+  // trimValues would strip each text node before the parser concatenates them, so
+  // prose interrupted by an inline element ("The <xhtml:code>x</xhtml:code> package")
+  // came back as "Thepackage". Keep the whitespace and let stripHTML collapse it, the
+  // way the Go converter does when it strips tags from the raw element text.
+  const parsed = parseXmlWithArrays(input, ARRAY_TAGS, { trimValues: false });
 
   // Detect input format: ARF or raw XCCDF
   const arfParsed = parsed as ArfParsed;
@@ -343,7 +347,11 @@ export async function convertXccdfBenchmarkToHdf(input: string, converterVersion
   }
   validateInputSize(input, 'xccdf-benchmark');
 
-  const parsed = parseXmlWithArrays(input, ARRAY_TAGS);
+  // trimValues would strip each text node before the parser concatenates them, so
+  // prose interrupted by an inline element ("The <xhtml:code>x</xhtml:code> package")
+  // came back as "Thepackage". Keep the whitespace and let stripHTML collapse it, the
+  // way the Go converter does when it strips tags from the raw element text.
+  const parsed = parseXmlWithArrays(input, ARRAY_TAGS, { trimValues: false });
   const xccdfParsed = parsed as XccdfBenchmark;
   const benchmark = xccdfParsed.Benchmark;
 
@@ -375,7 +383,11 @@ export async function convertXccdfToHdf(input: string, converterVersion = '1.0.0
   }
   validateInputSize(input, 'xccdf');
 
-  const parsed = parseXmlWithArrays(input, ARRAY_TAGS);
+  // trimValues would strip each text node before the parser concatenates them, so
+  // prose interrupted by an inline element ("The <xhtml:code>x</xhtml:code> package")
+  // came back as "Thepackage". Keep the whitespace and let stripHTML collapse it, the
+  // way the Go converter does when it strips tags from the raw element text.
+  const parsed = parseXmlWithArrays(input, ARRAY_TAGS, { trimValues: false });
 
   // Check ARF first
   const arfParsed = parsed as ArfParsed;
@@ -529,7 +541,7 @@ async function convertBenchmarkToBaselineJson(
     title: extractText(benchmark.title),
     version: extractVersion(benchmark.version),
     status: 'loaded',
-    summary: extractText(benchmark.description),
+    summary: stripHTML(extractText(benchmark.description)),
     integrity,
     requirements,
     groups,
@@ -558,7 +570,8 @@ function ruleToBaselineRequirement(
     data: stripHTML(extractVulnDiscussion(extractText(rule.description))),
   }];
 
-  const checkContent = extractCheckContent(rule.check);
+  const check = lastCheck(rule.check);
+  const checkContent = extractCheckContent(check);
   if (checkContent) {
     descriptions.push({ label: 'check', data: stripHTML(checkContent) });
   }
@@ -577,8 +590,8 @@ function ruleToBaselineRequirement(
   if (severity) {
     tags['severity'] = severity.toLowerCase();
   }
-  if (rule.check?.system) {
-    tags['check_id'] = rule.check.system;
+  if (check?.system) {
+    tags['check_id'] = check.system;
   }
   const fixtextObj = rule.fixtext;
   if (fixtextObj && typeof fixtextObj !== 'string' && fixtextObj.fixref) {
@@ -964,6 +977,16 @@ function decodeXmlEntities(s: string): string {
 /**
  * Extract plain text from a field that may be a string or {#text: string}.
  */
+/**
+ * A rule can carry several <check> elements (SSG emits SCE, OVAL and OCIL for the
+ * same rule). Go decodes <check> into one struct field, so encoding/xml overwrites
+ * it and the last element wins; match that or the two languages disagree.
+ */
+function lastCheck(check: CheckElement | CheckElement[] | undefined): CheckElement | undefined {
+  if (Array.isArray(check)) return check[check.length - 1];
+  return check;
+}
+
 function extractText(
   field: string | TextElement | VersionElement | undefined
 ): string {
