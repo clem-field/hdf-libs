@@ -3,6 +3,7 @@ import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
 import { convertHdfToXccdf } from './converter.js';
+import { normalizeXmlForGolden } from '../../../shared/typescript/xml-golden.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const fixturesDir = join(__dirname, '..', 'fixtures');
@@ -244,5 +245,17 @@ describe('hdf-to-xccdf Converter', () => {
       expect(result).toContain('<Rule');
       expect(result).toContain('REQ-001');
     });
+  });
+
+  // Whole-output goldens against the SAME files the Go TestGoldenParity asserts,
+  // under the SAME shared normalization — this is the TS<->Go parity guarantee.
+  describe('Golden parity', () => {
+    for (const name of ['minimal', 'stig-rhel7']) {
+      it(`matches the golden XCCDF for ${name}`, () => {
+        const out = convertHdfToXccdf(loadFixture(`${name}.json`));
+        const golden = readFileSync(join(fixturesDir, 'expected', `${name}.xccdf`), 'utf-8');
+        expect(normalizeXmlForGolden(out)).toBe(normalizeXmlForGolden(golden));
+      });
+    }
   });
 });

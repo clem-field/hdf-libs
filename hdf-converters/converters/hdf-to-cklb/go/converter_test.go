@@ -9,6 +9,7 @@ import (
 	ckl "github.com/mitre/hdf-libs/hdf-converters/v3/converters/ckl-to-hdf/go"
 	shared "github.com/mitre/hdf-libs/hdf-converters/v3/shared/go"
 	"github.com/mitre/hdf-libs/hdf-converters/v3/shared/go/checklist"
+	fixtures "github.com/mitre/hdf-libs/hdf-fixtures"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
@@ -118,4 +119,31 @@ func TestConvertHDFToCKLB_InvalidJSON(t *testing.T) {
 func TestConvertHDFToCKLB_NoBaselines(t *testing.T) {
 	_, err := ConvertHDFToCKLB([]byte(`{"baselines":[]}`))
 	assert.Error(t, err)
+}
+
+// TestGoldenParity asserts byte-for-byte output against frozen golden CKLBs,
+// generated from the real HDF in the shared @mitre/hdf-fixtures corpus. The
+// TypeScript test asserts the SAME files, so the two implementations cannot
+// drift apart. Run with UPDATE_GOLDEN=1 to rewrite.
+func TestGoldenParity(t *testing.T) {
+	// inspec-multilayered is deliberately NOT used: its startTime values carry no
+	// UTC offset, which the generated hdf.HDFResults time.Time field rejects, so no
+	// Go converter can read it.
+	goldens := map[string][]byte{
+		"minimal": fixtures.Results.Minimal,
+	}
+	for _, name := range []string{"minimal"} {
+		out, err := ConvertHDFToCKLB(goldens[name])
+		require.NoError(t, err, "convert %s", name)
+
+		goldenPath := filepath.Join(shared.GetConvertersDir(), "hdf-to-cklb", "fixtures", "expected", name+".cklb")
+		if os.Getenv("UPDATE_GOLDEN") == "1" {
+			require.NoError(t, os.MkdirAll(filepath.Dir(goldenPath), 0o755))
+			require.NoError(t, os.WriteFile(goldenPath, out, 0o644)) //nolint:gosec // test golden
+			continue
+		}
+		golden, err := os.ReadFile(goldenPath)
+		require.NoError(t, err, "read golden %s", goldenPath)
+		assert.Equal(t, string(golden), string(out), "golden mismatch for %s", name)
+	}
 }

@@ -2,10 +2,14 @@ package hdftooscalpoam
 
 import (
 	"encoding/json"
+	"os"
+	"path/filepath"
 	"testing"
 	"time"
 
 	oscal "github.com/mitre/hdf-libs/hdf-converters/v3/converters/oscal-to-hdf/go"
+	shared "github.com/mitre/hdf-libs/hdf-converters/v3/shared/go"
+	fixtures "github.com/mitre/hdf-libs/hdf-fixtures"
 	hdf "github.com/mitre/hdf-libs/hdf-schema/dist/go/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -556,4 +560,33 @@ func TestConvertHDFToOSCALPOAM_RoundTrip(t *testing.T) {
 	// Milestones should survive round trip
 	require.Len(t, override.Milestones, 1)
 	assert.Contains(t, override.Milestones[0].Description, "Deploy account management tool")
+}
+
+// Only the metadata timestamp carries the conversion moment; every other date
+// in a POA&M (milestone deadlines, expiration) is input-derived and stays asserted.
+var poamVolatileKeys = []string{"last-modified"}
+
+// TestGoldenParity asserts whole-output equality against a frozen golden.
+// The TypeScript test asserts against the SAME file, guaranteeing TS↔Go parity.
+// Fresh UUIDs and the conversion timestamp are masked (see shared.MaskVolatileJSON) —
+// the UUID reference graph survives masking, so wiring differences still fail.
+func TestGoldenParity(t *testing.T) {
+	out, err := ConvertHDFToOSCALPOAM(fixtures.Amendments.UC01Fixed, "1.0.0")
+	require.NoError(t, err)
+
+	goldenPath := filepath.Join(shared.GetConvertersDir(), "hdf-to-oscal-poam", "fixtures", "expected", "uc-01-fixed.oscal-poam.json")
+	if os.Getenv("UPDATE_GOLDEN") == "1" {
+		require.NoError(t, os.WriteFile(goldenPath, out, 0o644))
+		return
+	}
+
+	golden, err := os.ReadFile(goldenPath)
+	require.NoError(t, err, "read golden %s", goldenPath)
+
+	maskedGolden, err := shared.MaskVolatileJSON(golden, poamVolatileKeys)
+	require.NoError(t, err)
+	maskedOut, err := shared.MaskVolatileJSON(out, poamVolatileKeys)
+	require.NoError(t, err)
+
+	assert.Equal(t, maskedGolden, maskedOut, "golden mismatch for uc-01-fixed.oscal-poam.json")
 }

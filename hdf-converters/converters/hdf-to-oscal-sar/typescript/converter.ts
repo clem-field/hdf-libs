@@ -5,7 +5,7 @@
  * Results JSON and produces an OSCAL 1.1.2 assessment-results JSON document.
  */
 
-import { parseJSON } from '@mitre/hdf-utilities';
+import { parseJSON, parseTimestamp, formatTimestampSeconds } from '@mitre/hdf-utilities';
 import { validateInputSize } from '../../../shared/typescript/converterutil.js';
 import type { HDFResults, EvaluatedBaseline, EvaluatedRequirement, Description, RequirementResult } from '@mitre/hdf-schema';
 import type {
@@ -64,11 +64,15 @@ export async function convertHdfToOscalSar(input: string): Promise<string> {
  * Constructs the full OSCAL assessment-results document from HDF results.
  */
 function buildOSCALDocument(hdfResults: HDFResults): OscalSARDocument {
-  let timestamp = new Date().toISOString();
+  // Whole-second RFC3339 in UTC, matching what the Go converter emits.
+  let timestamp = formatTimestampSeconds(new Date());
   if (hdfResults.timestamp) {
-    timestamp = typeof hdfResults.timestamp === 'string'
-      ? hdfResults.timestamp
-      : hdfResults.timestamp.toISOString();
+    const parsed = typeof hdfResults.timestamp === 'string'
+      ? parseTimestamp(hdfResults.timestamp)
+      : hdfResults.timestamp;
+    if (parsed) {
+      timestamp = formatTimestampSeconds(parsed);
+    }
   }
 
   const metadata = {

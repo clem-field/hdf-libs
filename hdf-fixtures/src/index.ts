@@ -9,7 +9,7 @@
 // by more than one workspace package — not just "might be useful someday."
 //
 // Layout: top-level directories are by HDF document type (`results/`,
-// `baseline/`) plus `inspec/` for InSpec runner output (non-HDF;
+// `baseline/`, `amendments/`) plus `inspec/` for InSpec runner output (non-HDF;
 // kept for cross-language parser parity tests verifying both languages
 // reject non-HDF inputs the same way).
 //
@@ -48,6 +48,11 @@ export const baseline = {
   win2022Stig: fixture('baseline', 'win2022-stig.json'),
 } as const;
 
+// HDF Amendments documents.
+export const amendments = {
+  uc01Fixed: fixture('amendments', 'uc-01-fixed-amendments.json'),
+} as const;
+
 // InSpec runner output — NOT HDF. Kept here for cross-language parser
 // parity tests that verify both Go and TS parsers reject non-HDF inputs the
 // same way, and for the legacyhdf-to-hdf converter (its tests load these too).
@@ -62,5 +67,6 @@ export const inspec = {
 export const all = {
   results,
   baseline,
+  amendments,
   inspec,
 } as const;

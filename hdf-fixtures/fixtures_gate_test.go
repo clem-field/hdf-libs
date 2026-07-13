@@ -1,5 +1,6 @@
 // Self-contained validation gate for the hdf-fixtures corpus. Every fixture
-// in results/ must validate as HDF Results, baseline/* as HDF Baseline.
+// in results/ must validate as HDF Results, baseline/* as HDF Baseline,
+// amendments/* as HDF Amendments.
 // inspec/* is exempt — those files are InSpec runner output (NOT
 // HDF), kept here as input for the legacyhdf-to-hdf converter and as the
 // negative-case feed for the cross-language parser parity test.
@@ -43,6 +44,13 @@ func TestEveryFixtureValidatesAgainstItsSchema(t *testing.T) {
 			schema: validators.TypeBaseline,
 			fixtures: map[string][]byte{
 				"win2022-stig.json": Baseline.Win2022Stig,
+			},
+		},
+		{
+			name:   "amendments",
+			schema: validators.TypeAmendments,
+			fixtures: map[string][]byte{
+				"uc-01-fixed-amendments.json": Amendments.UC01Fixed,
 			},
 		},
 	}

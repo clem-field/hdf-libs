@@ -1,0 +1,86 @@
+{
+  "assessment-results": {
+    "uuid": "fbd1d9ba-1337-4a9c-a7cb-bce766517dd4",
+    "metadata": {
+      "title": "HDF Assessment Results Export",
+      "last-modified": "2026-07-13T01:19:51Z",
+      "version": "1.0.0",
+      "oscal-version": "1.1.2"
+    },
+    "import-ap": {
+      "href": "#"
+    },
+    "results": [
+      {
+        "uuid": "765aaa7f-9434-42a4-bcb4-5eb0213e8521",
+        "title": "Minimal Baseline",
+        "description": "Converted from HDF results",
+        "start": "2026-07-13T01:19:51Z",
+        "findings": [
+          {
+            "uuid": "4568aad0-236d-4274-963e-094b7457516b",
+            "title": "Test Requirement",
+            "description": "This is a test requirement",
+            "props": [
+              {
+                "name": "nist",
+                "value": "AC-1"
+              },
+              {
+                "name": "nist",
+                "value": "AC-2"
+              }
+            ],
+            "target": {
+              "type": "objective-id",
+              "target-id": "req-001",
+              "status": {
+                "state": "satisfied"
+              }
+            },
+            "related-observations": [
+              {
+                "observation-uuid": "335d4036-3743-4d08-9c69-a3de9ffb24ce"
+              }
+            ],
+            "related-risks": [
+              {
+                "risk-uuid": "17a17cff-0a67-47f7-ab42-01db5bcb49d7"
+              }
+            ]
+          }
+        ],
+        "observations": [
+          {
+            "uuid": "335d4036-3743-4d08-9c69-a3de9ffb24ce",
+            "description": "[passed] Control check passed",
+            "methods": [
+              "TEST"
+            ],
+            "collected": "2026-07-13T01:19:51Z"
+          }
+        ],
+        "risks": [
+          {
+            "uuid": "17a17cff-0a67-47f7-ab42-01db5bcb49d7",
+            "title": "Risk for REQ-001",
+            "description": "Impact: 0.7 (high)",
+            "statement": "Impact: 0.7 (high)",
+            "status": "closed",
+            "characterizations": [
+              {
+                "facets": [
+                  {
+                    "name": "impact",
+                    "system": "https://fedramp.gov",
+                    "value": "high"
+                  }
+                ]
+              }
+            ]
+          }
+        ]
+      }
+    ]
+  }
+}

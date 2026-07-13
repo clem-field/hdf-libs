@@ -31,9 +31,10 @@ See bead `hdf-libs-e95o` for the architecture rationale.
 
 ```
 hdf-fixtures/
-├── results/    — HDF Results docs
-├── baseline/   — HDF Baseline docs
-└── inspec/     — InSpec runner output (non-HDF)
+├── results/     — HDF Results docs
+├── baseline/    — HDF Baseline docs
+├── amendments/  — HDF Amendments docs
+└── inspec/      — InSpec runner output (non-HDF)
 ```
 
 The `inspec/` directory holds InSpec runner output (the input
@@ -60,6 +61,12 @@ CLAUDE.md's fixture-integrity rule).
 |------|--------|-----------|
 | `win2022-stig.json` | Windows Server 2022 STIG | hdf-generators TS + Go integration tests + hdf-parsers parser parity test. Was previously duplicated across `hdf-generators/go/testdata/` and `hdf-generators/test/fixtures/`. |
 
+### `amendments/` — HDF Amendments docs
+
+| File | Source | Consumers |
+|------|--------|-----------|
+| `uc-01-fixed-amendments.json` | HDF form of the CSAF spec example `2022-evd-uc-01-f-001.json` — produced by `csaf-vex-to-hdf` from that upstream VEX advisory. An open POA&M (vendor claims fixed, milestone still pending). | hdf-to-csaf-vex converter (TS + Go, incl. its golden) + hdf-to-oscal-poam converter (TS + Go golden). Moved from `hdf-converters/converters/hdf-to-csaf-vex/fixtures/input/`. |
+
 ### `inspec/` — InSpec runner output (NOT HDF)
 
 The input format for `legacyhdf-to-hdf` (which converts these to HDF). Kept
@@ -77,8 +84,8 @@ runner config.
 
 ## Validation gate
 
-`fixtures_gate_test.go` walks every HDF document in `results/` and
-`baseline/` and validates against the appropriate schema (replaces the
+`fixtures_gate_test.go` walks every HDF document in `results/`,
+`baseline/` and `amendments/` and validates against the appropriate schema (replaces the
 per-converter snapshot coverage hdf-cli's
 `converter_fixture_roundtrip_test.go` previously provided for these
 specific files now that they live here). `inspec/*` is exempt — those
@@ -89,7 +96,7 @@ files are non-HDF by design.
 **TypeScript:**
 
 ```ts
-import { results, baseline, inspec } from '@mitre/hdf-fixtures';
+import { results, baseline, amendments, inspec } from '@mitre/hdf-fixtures';
 
 // On-disk path (for tools that need a file argument):
 const path = results.inspecMultilayered.path;

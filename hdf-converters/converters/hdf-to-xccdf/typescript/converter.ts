@@ -17,6 +17,9 @@ const BUILD_OPTIONS = {
   format: true,
   indentBy: '  ',
   suppressEmptyNode: false,
+  // Without this, fast-xml-parser renders selected="true" as a bare `selected`,
+  // which is not valid XML — and diverges from the Go serializer.
+  suppressBooleanAttributes: false,
 };
 
 /**
@@ -86,14 +89,20 @@ function sanitizeXccdfId(id: string): string {
 
 /** Build the Benchmark XML object from HDF data. */
 function buildBenchmarkObj(hdfData: HDFResults): Record<string, unknown> {
+  const empty = !hdfData.baselines || hdfData.baselines.length === 0;
+
+  // Attribute order (id before resolved) and element order mirror the Go
+  // serializer's struct field order — the two assert the same golden.
   const benchmark: Record<string, unknown> = {
     [`${ATTR}xmlns`]: 'http://checklists.nist.gov/xccdf/1.2',
+    [`${ATTR}id`]: empty
+      ? 'xccdf_hdf_benchmark_exported'
+      : sanitizeXccdfId('xccdf_hdf_benchmark_' + hdfData.baselines[0]!.name),
     [`${ATTR}resolved`]: '1',
     status: wrap('incomplete'),
   };
 
-  if (!hdfData.baselines || hdfData.baselines.length === 0) {
-    benchmark[`${ATTR}id`] = 'xccdf_hdf_benchmark_exported';
+  if (empty) {
     benchmark.title = wrap('HDF Export');
     benchmark.version = wrap('1.0');
     return benchmark;
@@ -101,9 +110,6 @@ function buildBenchmarkObj(hdfData: HDFResults): Record<string, unknown> {
 
   const baseline = hdfData.baselines[0]!;
 
-  benchmark[`${ATTR}id`] = sanitizeXccdfId(
-    'xccdf_hdf_benchmark_' + baseline.name,
-  );
   benchmark.title = wrap(baseline.title ?? baseline.name);
   benchmark.version = wrap(baseline.version ?? '1.0');
 

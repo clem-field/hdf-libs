@@ -7,6 +7,7 @@ import (
 	"strings"
 	"testing"
 
+	shared "github.com/mitre/hdf-libs/hdf-converters/v3/shared/go"
 	hdf "github.com/mitre/hdf-libs/hdf-schema/dist/go/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -283,4 +284,26 @@ func TestConvertHDFToXCCDF_SpecialCharacters(t *testing.T) {
 
 	assert.Equal(t, 1, len(benchmark.Rules))
 	assert.Equal(t, `Rule with <angle> & "quotes"`, benchmark.Rules[0].Title)
+}
+
+// TestGoldenParity asserts whole-output equality against frozen golden XCCDF
+// documents built from the converter's real HDF inputs. The TypeScript test
+// asserts the SAME files under the SAME normalization, so the two
+// implementations cannot drift apart. Run with UPDATE_GOLDEN=1 to rewrite.
+func TestGoldenParity(t *testing.T) {
+	for _, name := range []string{"minimal", "stig-rhel7"} {
+		out, err := ConvertHDFToXCCDF(loadFixture(t, name+".json"), "test")
+		require.NoError(t, err, "convert %s", name)
+
+		goldenPath := filepath.Join("..", "fixtures", "expected", name+".xccdf")
+		if os.Getenv("UPDATE_GOLDEN") == "1" {
+			require.NoError(t, os.MkdirAll(filepath.Dir(goldenPath), 0o755))
+			require.NoError(t, os.WriteFile(goldenPath, out, 0o644)) //nolint:gosec // test golden
+			continue
+		}
+		golden, err := os.ReadFile(goldenPath)
+		require.NoError(t, err, "read golden %s", goldenPath)
+		assert.Equal(t, shared.NormalizeXMLForGolden(string(golden)), shared.NormalizeXMLForGolden(string(out)),
+			"golden mismatch for %s", name)
+	}
 }

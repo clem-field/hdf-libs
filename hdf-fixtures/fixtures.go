@@ -3,8 +3,8 @@
 // monorepo package can read it without computing on-disk paths. The matching
 // TS API lives at ./src/index.ts; both APIs point at the same physical files.
 //
-// Layout: top-level directories are by HDF document type (results/, baseline/)
-// plus inspec/ for InSpec runner output (non-HDF; kept for cross-
+// Layout: top-level directories are by HDF document type (results/, baseline/,
+// amendments/) plus inspec/ for InSpec runner output (non-HDF; kept for cross-
 // language parser parity tests verifying both languages reject non-HDF
 // inputs the same way).
 //
@@ -45,6 +45,18 @@ var Baseline = struct {
 	Win2022Stig []byte
 }{
 	Win2022Stig: baselineWin2022Stig,
+}
+
+// ── HDF Amendments ───────────────────────────────────────────────────────
+
+//go:embed amendments/uc-01-fixed-amendments.json
+var amendmentsUC01Fixed []byte
+
+// Amendments exposes embedded HDF Amendments documents.
+var Amendments = struct {
+	UC01Fixed []byte
+}{
+	UC01Fixed: amendmentsUC01Fixed,
 }
 
 // ── InSpec runner output (non-HDF) ───────────────────────────────────────

@@ -2,11 +2,13 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { results } from '@mitre/hdf-fixtures';
 import { convertHdfToCklb } from './converter.js';
 import { convertCklToHdf } from '../../ckl-to-hdf/typescript/converter.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const cklFixture = join(__dirname, '..', '..', 'ckl-to-hdf', 'fixtures', 'input', 'firefox-stig.ckl');
+const goldenDir = join(__dirname, '..', 'fixtures', 'expected');
 
 interface CklbRule {
   group_id?: string;
@@ -69,5 +71,12 @@ describe('hdf-to-cklb Converter', () => {
   it('throws on invalid input', () => {
     expect(() => convertHdfToCklb('not valid json')).toThrow();
     expect(() => convertHdfToCklb('{"baselines":[]}')).toThrow();
+  });
+
+  // Byte-for-byte equality with the SAME golden the Go TestGoldenParity asserts
+  // — this is the TS<->Go parity guarantee.
+  it('matches the golden CKLB byte-for-byte for the shared-corpus minimal HDF', () => {
+    const out = convertHdfToCklb(results.minimal.read());
+    expect(out).toBe(readFileSync(join(goldenDir, 'minimal.cklb'), 'utf-8'));
   });
 });

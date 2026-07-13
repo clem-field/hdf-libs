@@ -156,6 +156,14 @@ func ParseCKLB(input []byte) (*Checklist, error) {
 // Serialize
 // ---------------------------------------------------------------------------
 
+// orEmpty returns a non-nil slice so a required JSON array never marshals to null.
+func orEmpty(v []string) []string {
+	if v == nil {
+		return []string{}
+	}
+	return v
+}
+
 // SerializeCKLB renders the Checklist model as CKLB JSON bytes.
 func SerializeCKLB(cl *Checklist) ([]byte, error) {
 	doc := cklbDoc{
@@ -191,18 +199,20 @@ func SerializeCKLB(cl *Checklist) ([]byte, error) {
 		for j := range stig.Vulns {
 			v := &stig.Vulns[j]
 			cs.Rules = append(cs.Rules, cklbRule{
-				GroupID:         orDefault(v.GroupID, v.VulnNum),
-				GroupTitle:      v.GroupTitle,
-				RuleID:          v.RuleID,
-				RuleVersion:     v.RuleVer,
-				RuleTitle:       v.RuleTitle,
-				Severity:        v.Severity,
-				Weight:          orDefault(v.Weight, "10.0"),
-				CheckContent:    v.CheckContent,
-				FixText:         v.FixText,
-				Discussion:      v.VulnDiscuss,
-				Classification:  v.Classification,
-				CCIs:            v.CCIs,
+				GroupID:        orDefault(v.GroupID, v.VulnNum),
+				GroupTitle:     v.GroupTitle,
+				RuleID:         v.RuleID,
+				RuleVersion:    v.RuleVer,
+				RuleTitle:      v.RuleTitle,
+				Severity:       v.Severity,
+				Weight:         orDefault(v.Weight, "10.0"),
+				CheckContent:   v.CheckContent,
+				FixText:        v.FixText,
+				Discussion:     v.VulnDiscuss,
+				Classification: v.Classification,
+				// ccis is a required CKLB array: a nil slice would marshal to null,
+				// which STIG Viewer (and the TS serializer) do not emit.
+				CCIs:            orEmpty(v.CCIs),
 				LegacyIDs:       v.LegacyIDs,
 				Status:          v.Status.CKLBString(),
 				Comments:        v.Comments,

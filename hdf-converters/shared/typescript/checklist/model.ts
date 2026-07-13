@@ -49,6 +49,8 @@ export interface Vuln {
   status: CheckStatus;
   findingDetails?: string;
   comments?: string;
+  severityOverride?: string;
+  severityJustification?: string;
   /** Rarely-used STIG_DATA / rule fields preserved for round-trip. */
   extra?: Record<string, string>;
 }
