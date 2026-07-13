@@ -239,10 +239,13 @@ func requirementToFindingSet(req *hdf.EvaluatedRequirement, timestamp string) (o
 	if req.Impact > 0 {
 		riskUUID := oscal.GenerateUUID()
 		severity := oscal.ImpactToSeverity(req.Impact)
+		impactText := fmt.Sprintf("Impact: %.1f (%s)", req.Impact, severity)
 		risk = &oscal.Risk{
-			UUID:        riskUUID,
-			Title:       fmt.Sprintf("Risk for %s", req.ID),
-			Description: fmt.Sprintf("Impact: %.1f (%s)", req.Impact, severity),
+			UUID:  riskUUID,
+			Title: fmt.Sprintf("Risk for %s", req.ID),
+			// OSCAL requires both description and statement on a risk.
+			Description: impactText,
+			Statement:   impactText,
 			Status:      riskStatusFromState(state),
 			Characterizations: []oscal.Characterization{
 				{

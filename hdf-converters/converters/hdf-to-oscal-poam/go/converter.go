@@ -179,9 +179,11 @@ func overrideToPOAMItem(override *hdf.StandaloneOverride) (oscal.POAMItem, []osc
 	}
 
 	risk := oscal.Risk{
-		UUID:         riskUUID,
-		Title:        override.RequirementID,
+		UUID:  riskUUID,
+		Title: override.RequirementID,
+		// OSCAL requires both description and statement on a risk.
 		Description:  override.Reason,
+		Statement:    override.Reason,
 		Status:       riskStatus,
 		Props:        riskProps,
 		Remediations: remediations,

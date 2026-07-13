@@ -1,6 +1,17 @@
+import { readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
+import { results } from '@mitre/hdf-fixtures';
 import { convertHdfToOscalSar, aggregateStatus } from './converter.js';
 import { nistTagToControlId as nistTagToControlID, impactToSeverity } from '../../oscal-to-hdf/typescript/shared.js';
+import { maskVolatileJson } from '../../../shared/typescript/golden-mask.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// The conversion moment lands in these keys; every other date in the output is
+// input-derived and must stay asserted.
+const SAR_VOLATILE_KEYS = ['last-modified', 'start', 'collected'];
 
 /**
  * Returns a minimal valid HDF Results JSON string with one baseline,
@@ -381,5 +392,22 @@ describe('aggregateStatus', () => {
       { status: 'failed', codeDesc: 'test', startTime: new Date() },
     ] as any[];
     expect(aggregateStatus(results).state).toBe('not-satisfied');
+  });
+});
+
+// Whole-output equality with the SAME golden the Go TestGoldenParity asserts.
+// Fresh UUIDs and the conversion timestamp are masked (see golden-mask.ts) —
+// the UUID reference graph survives masking, so wiring differences still fail.
+describe('hdf-to-oscal-sar golden parity', () => {
+  it('matches the minimal golden (TS↔Go parity)', async () => {
+    const out = await convertHdfToOscalSar(results.minimal.read());
+    const golden = readFileSync(
+      join(__dirname, '..', 'fixtures', 'expected', 'minimal.oscal-sar.json'),
+      'utf-8',
+    );
+
+    expect(maskVolatileJson(JSON.parse(out), SAR_VOLATILE_KEYS)).toEqual(
+      maskVolatileJson(JSON.parse(golden), SAR_VOLATILE_KEYS),
+    );
   });
 });

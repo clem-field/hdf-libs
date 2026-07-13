@@ -571,7 +571,7 @@ type AssessmentResults struct {
 	ImportAP         *ImportAP           `json:"import-ap,omitempty"`
 	LocalDefinitions *ARLocalDefinitions `json:"local-definitions,omitempty"`
 	Results          []Result            `json:"results"`
-	BackMatter       BackMatter          `json:"back-matter"`
+	BackMatter       *BackMatter         `json:"back-matter,omitempty"`
 }
 
 // ImportAP references the assessment plan.
@@ -669,7 +669,7 @@ type PlanOfActionAndMilestones struct {
 	Observations     []Observation  `json:"observations,omitempty"`
 	Risks            []Risk         `json:"risks,omitempty"`
 	POAMItems        []POAMItem     `json:"poam-items"`
-	BackMatter       BackMatter     `json:"back-matter"`
+	BackMatter       *BackMatter    `json:"back-matter,omitempty"`
 }
 
 // POAMLocalDefs contains POA&M-specific local definitions.

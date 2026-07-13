@@ -2,11 +2,14 @@ import { describe, it, expect } from 'vitest';
 import { readFileSync } from 'fs';
 import { join, dirname } from 'path';
 import { fileURLToPath } from 'url';
+import { results } from '@mitre/hdf-fixtures';
 import { convertHdfToCkl } from './converter.js';
 import { convertCklToHdf } from '../../ckl-to-hdf/typescript/converter.js';
+import { normalizeXmlForGolden } from '../../../shared/typescript/xml-golden.js';
 
 const __dirname = dirname(fileURLToPath(import.meta.url));
 const cklFixture = join(__dirname, '..', '..', 'ckl-to-hdf', 'fixtures', 'input', 'firefox-stig.ckl');
+const goldenDir = join(__dirname, '..', 'fixtures', 'expected');
 
 describe('hdf-to-ckl Converter', () => {
   describe('Round-trip', () => {
@@ -68,6 +71,16 @@ describe('hdf-to-ckl Converter', () => {
 
     it('should throw on HDF with no baselines', () => {
       expect(() => convertHdfToCkl('{"baselines":[]}')).toThrow();
+    });
+  });
+
+  // Whole-output golden against the SAME file the Go TestGoldenParity asserts,
+  // under the SAME shared normalization — this is the TS<->Go parity guarantee.
+  describe('Golden parity', () => {
+    it('matches the golden CKL for the shared-corpus minimal HDF', () => {
+      const out = convertHdfToCkl(results.minimal.read());
+      const golden = readFileSync(join(goldenDir, 'minimal.ckl'), 'utf-8');
+      expect(normalizeXmlForGolden(out)).toBe(normalizeXmlForGolden(golden));
     });
   });
 });

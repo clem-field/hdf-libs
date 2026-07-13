@@ -7,12 +7,16 @@ import {
   ResultStatus,
   type HDFAmendments,
 } from '@mitre/hdf-schema';
+import { amendments as sharedAmendments } from '@mitre/hdf-fixtures';
 import { convertCsafVexToHdf } from '../../csaf-vex-to-hdf/typescript/converter.js';
 import { convertHdfToCsafVex, productIDsFor, stripProductsLine } from './converter.js';
 
 const TEST_VERSION = 'test';
 
+// uc-01-fixed-amendments.json lives in the shared corpus (hdf-to-oscal-poam
+// consumes it too); the other inputs are local to this converter.
 function loadInput(name: string): string {
+  if (name === 'uc-01-fixed-amendments.json') return sharedAmendments.uc01Fixed.read();
   return readFileSync(join(__dirname, '..', 'fixtures', 'input', name), 'utf-8');
 }
 

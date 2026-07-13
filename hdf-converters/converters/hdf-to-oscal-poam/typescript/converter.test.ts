@@ -1,6 +1,17 @@
+import { readFileSync } from 'node:fs';
+import { join, dirname } from 'node:path';
+import { fileURLToPath } from 'node:url';
 import { describe, it, expect } from 'vitest';
+import { amendments } from '@mitre/hdf-fixtures';
 import { convertHdfToOscalPoam } from './converter.js';
 import { hdfStatusToOscalRiskStatus as hdfStatusToOSCAL, nistTagToControlId as nistTagToControlID } from '../../oscal-to-hdf/typescript/shared.js';
+import { maskVolatileJson } from '../../../shared/typescript/golden-mask.js';
+
+const __dirname = dirname(fileURLToPath(import.meta.url));
+
+// Only the metadata timestamp carries the conversion moment; every other date
+// in a POA&M (milestone deadlines, expiration) is input-derived and stays asserted.
+const POAM_VOLATILE_KEYS = ['last-modified'];
 
 describe('convertHdfToOscalPoam', () => {
   it('should reject empty input', async () => {
@@ -286,7 +297,8 @@ describe('convertHdfToOscalPoam', () => {
     const risk = doc['plan-of-action-and-milestones'].risks[0];
     expect(risk['risk-log']).toBeDefined();
     expect(risk['risk-log'].entries).toHaveLength(1);
-    expect(risk['risk-log'].entries[0].start).toBe('2027-03-15T12:00:00.000Z');
+    // Whole-second RFC3339, byte-identical to the Go converter's output.
+    expect(risk['risk-log'].entries[0].start).toBe('2027-03-15T12:00:00Z');
   });
 
   it('should generate unique UUIDs', async () => {
@@ -353,5 +365,22 @@ describe('nistTagToControlID', () => {
     ['unknown', 'unknown'],
   ])('should convert %s to %s', (input, expected) => {
     expect(nistTagToControlID(input)).toBe(expected);
+  });
+});
+
+// Whole-output equality with the SAME golden the Go TestGoldenParity asserts.
+// Fresh UUIDs and the conversion timestamp are masked (see golden-mask.ts) —
+// the UUID reference graph survives masking, so wiring differences still fail.
+describe('hdf-to-oscal-poam golden parity', () => {
+  it('matches the uc-01-fixed golden (TS↔Go parity)', async () => {
+    const out = await convertHdfToOscalPoam(amendments.uc01Fixed.read());
+    const golden = readFileSync(
+      join(__dirname, '..', 'fixtures', 'expected', 'uc-01-fixed.oscal-poam.json'),
+      'utf-8',
+    );
+
+    expect(maskVolatileJson(JSON.parse(out), POAM_VOLATILE_KEYS)).toEqual(
+      maskVolatileJson(JSON.parse(golden), POAM_VOLATILE_KEYS),
+    );
   });
 });

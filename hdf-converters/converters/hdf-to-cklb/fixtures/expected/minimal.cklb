@@ -1,0 +1,47 @@
+{
+  "title": "STIG Checklist",
+  "cklb_version": "1.0",
+  "active": false,
+  "has_path": false,
+  "target_data": {
+    "target_type": "Computing",
+    "host_name": "web-server-01",
+    "ip_address": "",
+    "mac_address": "",
+    "fqdn": "",
+    "comments": "",
+    "role": "None",
+    "is_web_database": false,
+    "technology_area": "",
+    "web_db_site": "",
+    "web_db_instance": ""
+  },
+  "stigs": [
+    {
+      "stig_name": "",
+      "display_name": "",
+      "stig_id": "",
+      "release_info": "",
+      "version": "1.0.0",
+      "uuid": "",
+      "rules": [
+        {
+          "group_id": "REQ-001",
+          "group_title": "",
+          "rule_id": "",
+          "rule_version": "",
+          "rule_title": "Test Requirement",
+          "severity": "high",
+          "weight": "10.0",
+          "check_content": "",
+          "fix_text": "",
+          "discussion": "This is a test requirement",
+          "ccis": [],
+          "status": "not_a_finding",
+          "comments": "",
+          "finding_details": ""
+        }
+      ]
+    }
+  ]
+}

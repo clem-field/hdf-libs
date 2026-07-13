@@ -8,6 +8,7 @@ import (
 	"time"
 
 	csafvex "github.com/mitre/hdf-libs/hdf-converters/v3/converters/csaf-vex-to-hdf/go"
+	fixtures "github.com/mitre/hdf-libs/hdf-fixtures"
 	hdf "github.com/mitre/hdf-libs/hdf-schema/dist/go/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
@@ -22,8 +23,13 @@ func mustTime(t *testing.T, s string) time.Time {
 
 const testVersion = "test"
 
+// uc-01-fixed-amendments.json lives in the shared corpus (hdf-to-oscal-poam
+// consumes it too); the other inputs are local to this converter.
 func loadInput(t *testing.T, name string) []byte {
 	t.Helper()
+	if name == "uc-01-fixed-amendments.json" {
+		return fixtures.Amendments.UC01Fixed
+	}
 	data, err := os.ReadFile(filepath.Join("..", "fixtures", "input", name))
 	require.NoError(t, err)
 	return data

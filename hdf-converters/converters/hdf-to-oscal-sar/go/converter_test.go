@@ -7,10 +7,41 @@ import (
 	"testing"
 
 	oscal "github.com/mitre/hdf-libs/hdf-converters/v3/converters/oscal-to-hdf/go"
+	shared "github.com/mitre/hdf-libs/hdf-converters/v3/shared/go"
+	fixtures "github.com/mitre/hdf-libs/hdf-fixtures"
 	hdf "github.com/mitre/hdf-libs/hdf-schema/dist/go/v3"
 	"github.com/stretchr/testify/assert"
 	"github.com/stretchr/testify/require"
 )
+
+// The conversion moment lands in these keys; every other date in the output is
+// input-derived and must stay asserted.
+var sarVolatileKeys = []string{"last-modified", "start", "collected"}
+
+// TestGoldenParity asserts whole-output equality against a frozen golden.
+// The TypeScript test asserts against the SAME file, guaranteeing TS↔Go parity.
+// Fresh UUIDs and the conversion timestamp are masked (see shared.MaskVolatileJSON) —
+// the UUID reference graph survives masking, so wiring differences still fail.
+func TestGoldenParity(t *testing.T) {
+	out, err := ConvertHDFToOSCALSAR(fixtures.Results.Minimal, "1.0.0")
+	require.NoError(t, err)
+
+	goldenPath := filepath.Join(shared.GetConvertersDir(), "hdf-to-oscal-sar", "fixtures", "expected", "minimal.oscal-sar.json")
+	if os.Getenv("UPDATE_GOLDEN") == "1" {
+		require.NoError(t, os.WriteFile(goldenPath, out, 0o644))
+		return
+	}
+
+	golden, err := os.ReadFile(goldenPath)
+	require.NoError(t, err, "read golden %s", goldenPath)
+
+	maskedGolden, err := shared.MaskVolatileJSON(golden, sarVolatileKeys)
+	require.NoError(t, err)
+	maskedOut, err := shared.MaskVolatileJSON(out, sarVolatileKeys)
+	require.NoError(t, err)
+
+	assert.Equal(t, maskedGolden, maskedOut, "golden mismatch for minimal.oscal-sar.json")
+}
 
 // minimalHDFResults returns a minimal valid HDF Results JSON document
 // with one baseline, one requirement, and one result.

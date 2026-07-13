@@ -4,7 +4,7 @@
  * This is the reverse direction of the oscal-poam to HDF converter.
  */
 
-import { parseJSON } from '@mitre/hdf-utilities';
+import { parseJSON, parseTimestamp, formatTimestampSeconds } from '@mitre/hdf-utilities';
 import { validateInputSize } from '../../../shared/typescript/converterutil.js';
 import type { HDFAmendments, StandaloneOverride } from '@mitre/hdf-schema';
 import type {
@@ -53,11 +53,18 @@ export async function convertHdfToOscalPoam(input: string): Promise<string> {
   return JSON.stringify(doc, null, 2);
 }
 
+/** HDF dates arrive as strings from JSON.parse but are typed as Date. */
+function toDate(value: string | Date): Date | undefined {
+  const d = typeof value === 'string' ? parseTimestamp(value) : value;
+  if (!d || isNaN(d.getTime())) return undefined;
+  return d;
+}
+
 /**
  * Converts parsed HDFAmendments to an OSCAL PlanOfActionAndMilestones.
  */
 function amendmentsToPOAM(amendments: HDFAmendments): PlanOfActionAndMilestonesPOAM {
-  const now = new Date().toISOString();
+  const now = formatTimestampSeconds(new Date());
 
   const metadata = {
     title: amendments.name,
@@ -150,9 +157,9 @@ function overrideToPOAMItem(override: StandaloneOverride): { item: POAMItem; ite
     for (const ms of override.milestones) {
       const msProps: Property[] = [];
       if (ms.estimatedCompletion) {
-        const d = typeof ms.estimatedCompletion === 'string' ? new Date(ms.estimatedCompletion) : ms.estimatedCompletion;
-        if (!isNaN(d.getTime())) {
-          msProps.push({ name: 'estimated-completion', value: d.toISOString() });
+        const d = toDate(ms.estimatedCompletion);
+        if (d) {
+          msProps.push({ name: 'estimated-completion', value: formatTimestampSeconds(d) });
         }
       }
       if (ms.status) {
@@ -170,22 +177,19 @@ function overrideToPOAMItem(override: StandaloneOverride): { item: POAMItem; ite
 
   // Build risk log entry for expiration tracking
   let riskLog: RiskLog | undefined;
-  const expiresAt = override.expiresAt;
-  if (expiresAt) {
-    const expiresDate = typeof expiresAt === 'string' ? new Date(expiresAt) : expiresAt;
-    if (!isNaN(expiresDate.getTime()) && expiresDate.getTime() > 0) {
-      riskLog = {
-        entries: [
-          {
-            uuid: crypto.randomUUID(),
-            title: 'Scheduled review',
-            description: 'Amendment expiration date',
-            start: expiresDate.toISOString(),
-            'status-change': riskStatus,
-          },
-        ],
-      } as unknown as RiskLog;
-    }
+  const expiresDate = override.expiresAt ? toDate(override.expiresAt) : undefined;
+  if (expiresDate && expiresDate.getTime() > 0) {
+    riskLog = {
+      entries: [
+        {
+          uuid: crypto.randomUUID(),
+          title: 'Scheduled review',
+          description: 'Amendment expiration date',
+          start: formatTimestampSeconds(expiresDate),
+          'status-change': riskStatus,
+        },
+      ],
+    } as unknown as RiskLog;
   }
 
   const risk = {

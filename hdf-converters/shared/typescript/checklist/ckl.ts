@@ -32,6 +32,8 @@ interface VulnEl {
   STATUS?: string;
   FINDING_DETAILS?: unknown;
   COMMENTS?: unknown;
+  SEVERITY_OVERRIDE?: unknown;
+  SEVERITY_JUSTIFICATION?: unknown;
 }
 
 function str(v: unknown): string {
@@ -142,6 +144,8 @@ function cklVulnToModel(v: VulnEl): Vuln {
     status: parseStatus(v.STATUS),
     findingDetails: str(v.FINDING_DETAILS),
     comments: str(v.COMMENTS),
+    severityOverride: str(v.SEVERITY_OVERRIDE),
+    severityJustification: str(v.SEVERITY_JUSTIFICATION),
     extra,
   };
 }
@@ -194,6 +198,8 @@ function modelVulnToCkl(v: Vuln): {
   STATUS: string;
   FINDING_DETAILS: string;
   COMMENTS: string;
+  SEVERITY_OVERRIDE: string;
+  SEVERITY_JUSTIFICATION: string;
 } {
   const typed: Record<string, string> = {
     Vuln_Num: v.vulnNum,
@@ -222,5 +228,8 @@ function modelVulnToCkl(v: Vuln): {
     STATUS: statusToCkl(v.status),
     FINDING_DETAILS: v.findingDetails ?? '',
     COMMENTS: v.comments ?? '',
+    // STIG Viewer always writes these two, even empty; the Go serializer does too.
+    SEVERITY_OVERRIDE: v.severityOverride ?? '',
+    SEVERITY_JUSTIFICATION: v.severityJustification ?? '',
   };
 }

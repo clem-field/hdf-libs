@@ -16,6 +16,10 @@ survive.
   (an open POA&M imported from a VEX `fixed` statement). Exercises the
   "supplier said fixed, system not yet verified" path: the export must
   NOT emit `fixed`, only `known_affected` with a remediation hint.
+  **Lives in `@mitre/hdf-fixtures` (`amendments/`), not in `input/`** —
+  hdf-to-oscal-poam consumes the same file for its golden, so per the
+  fixture boundary rule it is shared, not duplicated. The tests here load
+  it from the corpus.
 
 ## Partial-fidelity contract
 
