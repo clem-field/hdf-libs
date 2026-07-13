@@ -5,8 +5,8 @@
  * Results JSON and produces an OSCAL 1.1.2 assessment-results JSON document.
  */
 
-import { parseTimestamp, formatTimestampSeconds } from '@mitre/hdf-utilities';
-import { validateInputSize, parseHdf } from '../../../shared/typescript/converterutil.js';
+import { formatTimestampSeconds } from '@mitre/hdf-utilities';
+import { validateInputSize, parseHdf, hdfTime } from '../../../shared/typescript/converterutil.js';
 import type { HDFResults, EvaluatedBaseline, EvaluatedRequirement, Description, RequirementResult } from '@mitre/hdf-schema';
 import type {
   SecurityAssessmentResultsSAR,
@@ -66,13 +66,9 @@ export async function convertHdfToOscalSar(input: string): Promise<string> {
 function buildOSCALDocument(hdfResults: HDFResults): OscalSARDocument {
   // Whole-second RFC3339 in UTC, matching what the Go converter emits.
   let timestamp = formatTimestampSeconds(new Date());
-  if (hdfResults.timestamp) {
-    const parsed = typeof hdfResults.timestamp === 'string'
-      ? parseTimestamp(hdfResults.timestamp)
-      : hdfResults.timestamp;
-    if (parsed) {
-      timestamp = formatTimestampSeconds(parsed);
-    }
+  const documentTime = hdfTime(hdfResults.timestamp);
+  if (documentTime) {
+    timestamp = formatTimestampSeconds(documentTime);
   }
 
   const metadata = {
@@ -102,6 +98,52 @@ function buildOSCALDocument(hdfResults: HDFResults): OscalSARDocument {
       results,
     },
   };
+}
+
+// Assessment-time helpers. OSCAL result.start (when the assessment ran) and
+// observation.collected (when the evidence was gathered) both describe the scan,
+// which HDF carries on each requirement result — not the document timestamp,
+// which is merely when the file was written.
+
+/** Earliest startTime across the results, or undefined if none carry one. */
+function earliestResultTime(results: RequirementResult[] | undefined): Date | undefined {
+  let earliest: Date | undefined;
+
+  for (const result of results ?? []) {
+    const parsed = hdfTime(result.startTime);
+    if (!parsed) continue;
+
+    if (earliest === undefined || parsed < earliest) {
+      earliest = parsed;
+    }
+  }
+
+  return earliest;
+}
+
+/**
+ * Render an assessment time. OSCAL requires result.start and
+ * observation.collected, so a fallback is needed when HDF carries no result time
+ * — but it must never win over a real one.
+ */
+function formatAssessmentTime(time: Date | undefined, fallback: string): string {
+  return time === undefined ? fallback : formatTimestampSeconds(time);
+}
+
+/** When the assessment ran: the earliest result time anywhere in the baseline. */
+function assessmentStart(baseline: EvaluatedBaseline, fallback: string): string {
+  let earliest: Date | undefined;
+
+  for (const req of baseline.requirements) {
+    const reqEarliest = earliestResultTime(req.results);
+    if (reqEarliest === undefined) continue;
+
+    if (earliest === undefined || reqEarliest < earliest) {
+      earliest = reqEarliest;
+    }
+  }
+
+  return formatAssessmentTime(earliest, fallback);
 }
 
 /**
@@ -137,7 +179,7 @@ function baselineToResult(baseline: EvaluatedBaseline, timestamp: string): Asses
     uuid: crypto.randomUUID(),
     title,
     description,
-    start: timestamp,
+    start: assessmentStart(baseline, timestamp),
     findings,
     observations,
     risks,
@@ -222,7 +264,9 @@ function requirementToFindingSet(
       uuid: obsUUID,
       description: obsDesc,
       methods: ['TEST'],
-      collected: timestamp,
+      // When the evidence was gathered — the scan time for this requirement, not
+      // when the file was converted.
+      collected: formatAssessmentTime(earliestResultTime(req.results), timestamp),
     } as unknown as Observation;
     finding['related-observations'] = [{ 'observation-uuid': obsUUID }];
   }
