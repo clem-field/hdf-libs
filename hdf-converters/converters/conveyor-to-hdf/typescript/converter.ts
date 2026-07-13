@@ -8,6 +8,7 @@ import type {
   EvaluatedBaseline,
   EvaluatedRequirement,
   Checksum,
+  RequirementResult,
 } from '@mitre/hdf-schema';
 import {
   ResultStatus,
@@ -15,7 +16,6 @@ import {
   VerificationMethodEnum,
   createMinimalBaseline,
   createRequirement,
-  createResult,
   type Description,
 } from '@mitre/hdf-schema';
 
@@ -217,23 +217,12 @@ function buildRequirementFromResult(
   const score = result.result.score;
   const status = determineStatus(score);
 
-  let results;
-  if (result.result.sections.length > 0) {
-    results = result.result.sections.map(section => {
-      const codeDesc = buildCodeDesc(section, scannerName);
-      return createResult(status, undefined, {
-        codeDesc,
-        startTime,
-      });
-    });
-  } else {
-    results = [
-      createResult(status, undefined, {
-        codeDesc: `No sections reported by ${scannerName}`,
-        startTime,
-      }),
-    ];
-  }
+  // Conveyor carries no per-section explanation, so results carry no message key.
+  const toResult = (codeDesc: string): RequirementResult => ({ status, codeDesc, startTime });
+
+  const results = result.result.sections.length > 0
+    ? result.result.sections.map(section => toResult(buildCodeDesc(section, scannerName)))
+    : [toResult(`No sections reported by ${scannerName}`)];
 
   const req = createRequirement(
     result.sha256,
@@ -286,7 +275,7 @@ function buildScannerBaseline(
  * @param input - Conveyor JSON string
  * @returns HDF JSON string
  */
-export async function convertConveyorToHdf(input: string): Promise<string> {
+export async function convertConveyorToHdf(input: string, converterVersion = '1.0.0'): Promise<string> {
   if (!input || input.trim().length === 0) {
     throw new Error('conveyor: empty input');
   }
@@ -353,7 +342,7 @@ export async function convertConveyorToHdf(input: string): Promise<string> {
 
   return buildHdfResults({
     generatorName: 'conveyor-to-hdf',
-    converterVersion: '1.0.0',
+    converterVersion,
     toolName: 'Conveyor',
     toolFormat: 'JSON',
     baselines,

@@ -13,7 +13,6 @@ import {
   VerificationMethodEnum,
   createMinimalBaseline,
   createRequirement,
-  createResult,
   type Description,
 } from '@mitre/hdf-schema';
 
@@ -165,7 +164,13 @@ function buildResultFromAssessment(a: Assessment, scanTime: Date): RequirementRe
   const codeDesc = `Resource: ${a.properties.resourceDetails.id}`;
   const message = a.properties.status.description || a.properties.status.cause || undefined;
 
-  return createResult(status, message, { codeDesc, startTime: scanTime });
+  // Healthy assessments carry no explanation, so `message` stays absent rather
+  // than an empty string (createResult would default it to '').
+  const result: RequirementResult = { status, codeDesc, startTime: scanTime };
+  if (message !== undefined) {
+    result.message = message;
+  }
+  return result;
 }
 
 /**
@@ -174,7 +179,7 @@ function buildResultFromAssessment(a: Assessment, scanTime: Date): RequirementRe
  * @param input - JSON string containing Azure Security Assessments API response
  * @returns HDF JSON string
  */
-export async function convertMsftDefenderCloudToHdf(input: string): Promise<string> {
+export async function convertMsftDefenderCloudToHdf(input: string, converterVersion = '1.0.0'): Promise<string> {
   validateInputSize(input, 'msft-defender-cloud');
 
   const scanTime = new Date();
@@ -246,7 +251,7 @@ export async function convertMsftDefenderCloudToHdf(input: string): Promise<stri
 
   return buildHdfResults({
     generatorName: 'msft-defender-cloud-to-hdf',
-    converterVersion: '1.0.0',
+    converterVersion,
     toolName: 'Microsoft Defender for Cloud',
     toolFormat: 'JSON',
     baselines: [baseline],

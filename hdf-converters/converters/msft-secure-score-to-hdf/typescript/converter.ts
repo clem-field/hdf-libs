@@ -4,8 +4,10 @@ import {
 } from '@mitre/hdf-mappings';
 import { deriveControlTypeFromTags, inputChecksum, limitArray, stripHTML, buildNistCciTags, validateInputSize, buildHdfResults } from '../../../shared/typescript/converterutil.js';
 import type {
+  Component,
   EvaluatedBaseline,
   EvaluatedRequirement,
+  RequirementResult,
   Checksum,
 } from '@mitre/hdf-schema';
 import {
@@ -14,7 +16,6 @@ import {
   VerificationMethodEnum,
   createMinimalBaseline,
   createRequirement,
-  createResult,
   type Description,
 } from '@mitre/hdf-schema';
 
@@ -196,11 +197,10 @@ function buildRequirement(
   // StartTime from createdDateTime
   const startTime = (createdDateTime ? parseTimestamp(createdDateTime) : null) ?? new Date('0001-01-01T00:00:00Z');
 
-  const results = [
-    createResult(status, undefined, {
-      codeDesc,
-      ...(startTime ? { startTime } : {}),
-    }),
+  // Secure Score has no per-result explanation beyond codeDesc, so `message`
+  // stays absent rather than an empty string (createResult would default it to '').
+  const results: RequirementResult[] = [
+    { status, codeDesc, startTime },
   ];
 
   const req = createRequirement(
@@ -228,7 +228,7 @@ function buildRequirement(
  * @param input - Combined JSON string with secureScore and profiles
  * @returns HDF JSON string
  */
-export async function convertMsftSecureScoreToHdf(input: string): Promise<string> {
+export async function convertMsftSecureScoreToHdf(input: string, converterVersion = '1.0.0'): Promise<string> {
   if (!input || input.trim().length === 0) {
     throw new Error('msft-secure-score: empty input');
   }
@@ -285,13 +285,14 @@ export async function convertMsftSecureScoreToHdf(input: string): Promise<string
 
   return buildHdfResults({
     generatorName: 'msft-secure-score-to-hdf',
-    converterVersion: '1.0.0',
+    converterVersion,
     toolName: 'Microsoft Secure Score',
     toolFormat: 'JSON',
     baselines,
     components: [{
       name: `Azure Tenant: ${tenantId}`,
       type: TargetType.CloudAccount,
+      provider: 'azure' as Component['provider'],
       labels: { account: tenantId, provider: 'azure' },
     }],
     timestamp: new Date(),

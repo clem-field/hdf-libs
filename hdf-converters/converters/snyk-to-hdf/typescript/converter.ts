@@ -124,12 +124,14 @@ function buildRequirement(vulnID: string, vulns: SnykVuln[], scanTime: Date, pac
     { label: 'default', data: rep.description },
   ];
 
-  const results = vulns.map(vuln =>
-    createResult(ResultStatus.Failed, undefined, {
+  const results = vulns.map(vuln => {
+    const result = createResult(ResultStatus.Failed, undefined, {
       codeDesc: formatDependencyPath(vuln.from),
       startTime: scanTime,
-    })
-  );
+    });
+    delete result.message;
+    return result;
+  });
 
   const req = createRequirement(
     vulnID,
@@ -228,7 +230,7 @@ function convertSingleProject(
  * @param input - Snyk JSON or SARIF string
  * @returns HDF JSON string
  */
-export async function convertSnykToHdf(input: string): Promise<string> {
+export async function convertSnykToHdf(input: string, converterVersion = '1.0.0'): Promise<string> {
   if (!input || input.trim().length === 0) {
     throw new Error('snyk: empty input');
   }
@@ -238,7 +240,7 @@ export async function convertSnykToHdf(input: string): Promise<string> {
   registerAllFingerprints();
   const detected = detectConverter(input);
   if (detected && detected.fingerprint.id === 'sarif-to-hdf') {
-    return convertSarifToHdf(input);
+    return convertSarifToHdf(input, converterVersion);
   }
 
   const resultsChecksum: Checksum = await inputChecksum(input);
@@ -274,7 +276,7 @@ export async function convertSnykToHdf(input: string): Promise<string> {
 
   return buildHdfResults({
     generatorName: 'snyk-to-hdf',
-    converterVersion: '1.0.0',
+    converterVersion,
     toolName: 'Snyk',
     toolFormat: 'JSON',
     baselines,

@@ -34,6 +34,9 @@ interface SonarQubeIssuesResponse {
   issues: SonarQubeIssue[];
   components?: SonarQubeComponent[];
   rules?: SonarQubeRule[];
+  // Populated by the fetcher from /api/server/version, so it travels with the
+  // data and lands on tool.version.
+  serverVersion?: string;
 }
 
 type MqrSeverity = 'BLOCKER' | 'HIGH' | 'MEDIUM' | 'LOW' | 'INFO';
@@ -213,7 +216,7 @@ const DEFAULT_NIST_TAGS = ['SA-11'];
  * @param input - JSON string from SonarQube /api/issues/search endpoint
  * @returns HDF JSON string
  */
-export async function convertSonarqubeToHdf(input: string): Promise<string> {
+export async function convertSonarqubeToHdf(input: string, converterVersion = '1.0.0'): Promise<string> {
   validateInputSize(input, 'sonarqube');
   // Calculate checksum of source scan data
   const resultsChecksum: Checksum = await inputChecksum(input);
@@ -298,8 +301,9 @@ export async function convertSonarqubeToHdf(input: string): Promise<string> {
   // Build HDF
   return buildHdfResults({
     generatorName: 'sonarqube-to-hdf',
-    converterVersion: '1.0.0',
+    converterVersion,
     toolName: 'SonarQube',
+    toolVersion: sonarData.serverVersion || undefined,
     baselines,
     components,
     timestamp: new Date(),

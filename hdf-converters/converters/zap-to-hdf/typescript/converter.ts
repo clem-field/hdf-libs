@@ -166,13 +166,13 @@ function parseZapTimestamp(s: string): Date | undefined {
 
 // --- Main converter ---
 
-export async function convertZapToHdf(input: string): Promise<string> {
+export async function convertZapToHdf(input: string, converterVersion = '1.0.0'): Promise<string> {
   validateInputSize(input, 'zap');
   // SARIF routing — delegate to the shared SARIF converter
   registerAllFingerprints();
   const detected = detectConverter(input);
   if (detected && detected.fingerprint.id === 'sarif-to-hdf') {
-    return convertSarifToHdf(input);
+    return convertSarifToHdf(input, converterVersion);
   }
 
   const resultsChecksum: Checksum = await inputChecksum(input);
@@ -316,7 +316,7 @@ export async function convertZapToHdf(input: string): Promise<string> {
     components,
     generator: {
       name: 'zap-to-hdf',
-      version: 'unknown',
+      version: converterVersion,
     },
     tool,
   };

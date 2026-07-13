@@ -1,5 +1,5 @@
 import { parseXmlWithArrays, parseTimestamp } from '@mitre/hdf-utilities';
-import { buildNoFindingsRequirement, deriveControlTypeFromTags, inputChecksum, inputIntegrity, limitArray, validateInputSize, serializeHdf } from '../../../shared/typescript/converterutil.js';
+import { buildNoFindingsRequirement, deriveControlTypeFromTags, inputChecksum, inputIntegrity, limitArray, stripHTML, validateInputSize, serializeHdf } from '../../../shared/typescript/converterutil.js';
 import type {
   HDFResults,
   HDFBaseline,
@@ -18,7 +18,6 @@ import {
   Severity,
   createMinimalBaseline,
   createRequirement,
-  createResult,
   severityToImpact,
 } from '@mitre/hdf-schema';
 import { getCCINistMappings } from '@mitre/hdf-mappings';
@@ -187,10 +186,6 @@ interface ArfReportElement {
 // Constants
 // ---------------------------------------------------------------------------
 
-const CONVERTER_VERSION = '1.0.0';
-
-const CCI_SYSTEM = 'http://cyber.mil/cci';
-
 /** Tags that must always be parsed as arrays even if only one element exists. */
 const ARRAY_TAGS = [
   'Group',
@@ -251,7 +246,7 @@ function parseStartTime(raw: string | undefined): Date {
   return new Date();
 }
 
-export async function convertXccdfResultsToHdf(input: string): Promise<string> {
+export async function convertXccdfResultsToHdf(input: string, converterVersion = '1.0.0'): Promise<string> {
   if (!input || !input.trim()) {
     throw new Error('Empty input');
   }
@@ -262,7 +257,7 @@ export async function convertXccdfResultsToHdf(input: string): Promise<string> {
   // Detect input format: ARF or raw XCCDF
   const arfParsed = parsed as ArfParsed;
   if (arfParsed['asset-report-collection']) {
-    return convertArfCollection(arfParsed['asset-report-collection'], input);
+    return convertArfCollection(arfParsed['asset-report-collection'], input, converterVersion);
   }
 
   const xccdfParsed = parsed as XccdfBenchmark;
@@ -279,7 +274,7 @@ export async function convertXccdfResultsToHdf(input: string): Promise<string> {
     );
   }
 
-  return convertBenchmarkResultsToHdf(benchmark, input);
+  return convertBenchmarkResultsToHdf(benchmark, input, converterVersion);
 }
 
 /**
@@ -289,7 +284,7 @@ export async function convertXccdfResultsToHdf(input: string): Promise<string> {
  * @param input - Raw XML string (XCCDF Benchmark without TestResult)
  * @returns Stringified HDF Baseline JSON
  */
-export async function convertXccdfBenchmarkToHdf(input: string): Promise<string> {
+export async function convertXccdfBenchmarkToHdf(input: string, converterVersion = '1.0.0'): Promise<string> {
   if (!input || !input.trim()) {
     throw new Error('Empty input');
   }
@@ -311,7 +306,7 @@ export async function convertXccdfBenchmarkToHdf(input: string): Promise<string>
     );
   }
 
-  return convertBenchmarkToBaselineJson(benchmark, input);
+  return convertBenchmarkToBaselineJson(benchmark, input, converterVersion);
 }
 
 /**
@@ -321,7 +316,7 @@ export async function convertXccdfBenchmarkToHdf(input: string): Promise<string>
  * @param input - Raw XML string
  * @returns Object with json output and outputType ('baseline' or 'results')
  */
-export async function convertXccdfToHdf(input: string): Promise<{ json: string; outputType: 'baseline' | 'results' }> {
+export async function convertXccdfToHdf(input: string, converterVersion = '1.0.0'): Promise<{ json: string; outputType: 'baseline' | 'results' }> {
   if (!input || !input.trim()) {
     throw new Error('Empty input');
   }
@@ -332,7 +327,7 @@ export async function convertXccdfToHdf(input: string): Promise<{ json: string; 
   // Check ARF first
   const arfParsed = parsed as ArfParsed;
   if (arfParsed['asset-report-collection']) {
-    const json = await convertArfCollection(arfParsed['asset-report-collection'], input);
+    const json = await convertArfCollection(arfParsed['asset-report-collection'], input, converterVersion);
     return { json, outputType: 'results' };
   }
 
@@ -346,11 +341,11 @@ export async function convertXccdfToHdf(input: string): Promise<{ json: string; 
   }
 
   if (benchmark.TestResult) {
-    const json = await convertBenchmarkResultsToHdf(benchmark, input);
+    const json = await convertBenchmarkResultsToHdf(benchmark, input, converterVersion);
     return { json, outputType: 'results' };
   }
 
-  const json = await convertBenchmarkToBaselineJson(benchmark, input);
+  const json = await convertBenchmarkToBaselineJson(benchmark, input, converterVersion);
   return { json, outputType: 'baseline' };
 }
 
@@ -360,7 +355,8 @@ export async function convertXccdfToHdf(input: string): Promise<{ json: string; 
 
 async function convertBenchmarkResultsToHdf(
   benchmark: BenchmarkElement,
-  rawInput: string
+  rawInput: string,
+  converterVersion: string
 ): Promise<string> {
   const testResult = benchmark.TestResult!;
 
@@ -394,40 +390,40 @@ async function convertBenchmarkResultsToHdf(
 
   const resultsChecksum: Checksum = await inputChecksum(rawInput);
 
-  const baselineName = extractText(benchmark.title) || 'XCCDF Benchmark';
+  const baselineName = extractText(benchmark.title) || benchmark.id || '';
 
+  // Assigned after createMinimalBaseline because that helper drops empty-string
+  // options, while Go emits them (a benchmark with no description yields "").
   const baseline = createMinimalBaseline(
     baselineName,
     requirements,
     { resultsChecksum }
   ) as EvaluatedBaseline;
-
-  const components = buildTargets(testResult);
-
-  const timestamp = scanTime;
-
-  let durationSeconds: number | undefined;
-  if (testResult['start-time'] && testResult['end-time']) {
-    const start = parseTimestamp(testResult['start-time'])?.getTime();
-    const end = parseTimestamp(testResult['end-time'])?.getTime();
-    if (start !== undefined && end !== undefined && end >= start) {
-      durationSeconds = (end - start) / 1000;
-    }
-  }
+  baseline.title = baselineName;
+  baseline.version = extractVersion(benchmark.version);
+  baseline.status = 'loaded';
+  baseline.summary = stripHTML(extractText(benchmark.description));
 
   const hdf: HDFResults = {
     baselines: [baseline],
-    generator: { name: 'xccdf-results-to-hdf', version: CONVERTER_VERSION },
-    tool: { name: 'XCCDF Results', format: 'XML' },
-    components,
-    timestamp,
+    generator: { name: 'xccdf-results-to-hdf', version: converterVersion },
+    tool: { name: 'XCCDF', format: 'XCCDF' },
+    components: buildTargets(testResult),
+    timestamp: scanTime,
+    statistics: { duration: calculateDuration(testResult) },
   };
 
-  if (durationSeconds !== undefined) {
-    hdf.statistics = { duration: durationSeconds };
-  }
-
   return serializeHdf(hdf);
+}
+
+/** Seconds between the TestResult start-time and end-time; 0 when unavailable. */
+function calculateDuration(testResult: TestResultElement): number {
+  const start = testResult['start-time'] ? parseTimestamp(testResult['start-time'])?.getTime() : undefined;
+  const end = testResult['end-time'] ? parseTimestamp(testResult['end-time'])?.getTime() : undefined;
+  if (start === undefined || end === undefined || end < start) {
+    return 0;
+  }
+  return (end - start) / 1000;
 }
 
 // ---------------------------------------------------------------------------
@@ -436,7 +432,8 @@ async function convertBenchmarkResultsToHdf(
 
 async function convertBenchmarkToBaselineJson(
   benchmark: BenchmarkElement,
-  rawInput: string
+  rawInput: string,
+  converterVersion: string
 ): Promise<string> {
   const integrity = await inputIntegrity(rawInput);
 
@@ -480,7 +477,7 @@ async function convertBenchmarkToBaselineJson(
     integrity,
     requirements,
     groups,
-    generator: { name: 'xccdf-results-to-hdf', version: CONVERTER_VERSION },
+    generator: { name: 'xccdf-results-to-hdf', version: converterVersion },
   };
 
   return serializeHdf(baseline);
@@ -493,42 +490,30 @@ function ruleToBaselineRequirement(
   rule: RuleElement,
   group: GroupElement | undefined
 ): BaselineRequirement {
-  const id = extractVersion(rule.version) || rule.id || '';
-  const title = extractText(rule.title) || id;
-  const severity = rule.severity ?? '';
+  const id = extractRuleID(rule.id ?? '') || extractVersion(rule.version);
+  // A title-less rule gets no title at all: an empty string is junk, and
+  // synthesizing one from the id would invent data. Go omits it too.
+  const title = extractText(rule.title) || undefined;
+  const severity = (rule.severity ?? '').toLowerCase();
   const impact = severity ? severityToImpact(severity) : 0.5;
 
-  const descriptions: Description[] = [];
-  const rawDesc = extractText(rule.description);
-  if (rawDesc) {
-    descriptions.push({
-      label: 'default',
-      data: extractVulnDiscussion(rawDesc),
-    });
-  } else {
-    descriptions.push({ label: 'default', data: '' });
-  }
+  const descriptions: Description[] = [{
+    label: 'default',
+    data: stripHTML(extractVulnDiscussion(extractText(rule.description))),
+  }];
 
   const checkContent = extractCheckContent(rule.check);
   if (checkContent) {
-    descriptions.push({ label: 'check', data: checkContent });
+    descriptions.push({ label: 'check', data: stripHTML(checkContent) });
   }
 
   const fixtext = extractFixtext(rule.fixtext);
   if (fixtext) {
-    descriptions.push({ label: 'fix', data: fixtext });
+    descriptions.push({ label: 'fix', data: stripHTML(fixtext) });
   }
 
-  const tags: Record<string, unknown> = {};
-  let nistTags: string[] = [];
-  const cciIds = extractCCIs(rule.ident ?? []);
-  if (cciIds.length > 0) {
-    tags['cci'] = cciIds;
-    nistTags = [...new Set(cciIds.flatMap((cci) => getCCINistMappings(cci) ?? []))];
-    if (nistTags.length > 0) {
-      tags['nist'] = nistTags;
-    }
-  }
+  const tags = buildCciNistTags(extractCCIs(rule.ident ?? []));
+  const nistTags = tags['nist'] as string[];
 
   // STIG-specific tags
   tags['rid'] = rule.id;
@@ -574,7 +559,8 @@ function ruleToBaselineRequirement(
 
 async function convertArfCollection(
   arc: ArfCollectionElement,
-  rawInput: string
+  rawInput: string,
+  converterVersion: string
 ): Promise<string> {
   const resultsChecksum: Checksum = await inputChecksum(rawInput);
 
@@ -615,22 +601,14 @@ async function convertArfCollection(
       continue;
     }
 
-    // Timing
-    if (testResult['start-time'] && !firstTimestamp) {
-      const t = parseTimestamp(testResult['start-time']);
-      if (t) firstTimestamp = t;
-    }
-    if (testResult['start-time'] && testResult['end-time']) {
-      const start = parseTimestamp(testResult['start-time'])?.getTime();
-      const end = parseTimestamp(testResult['end-time'])?.getTime();
-      if (start !== undefined && end !== undefined && end >= start) {
-        totalDuration += (end - start) / 1000;
-      }
-    }
-
     // The test result's start-time applies to its rule-results; fall back to
     // conversion time when absent or invalid (startTime is required on each result).
     const scanTime = parseStartTime(testResult['start-time']);
+
+    if (!firstTimestamp) {
+      firstTimestamp = scanTime;
+    }
+    totalDuration += calculateDuration(testResult);
 
     // Convert rule-results
     const ruleResults = testResult['rule-result'] ?? [];
@@ -658,10 +636,10 @@ async function convertArfCollection(
     // Baseline name from Benchmark title
     let baselineName = '';
     if (benchmark) {
-      baselineName = extractText(benchmark.title) || '';
+      baselineName = extractText(benchmark.title) || benchmark.id || '';
     }
     if (!baselineName) {
-      baselineName = extractText(testResult.title) || testResult.id || 'ARF Report';
+      baselineName = extractText(testResult.title) || testResult.id || '';
     }
 
     const baseline = createMinimalBaseline(
@@ -669,6 +647,12 @@ async function convertArfCollection(
       requirements,
       { resultsChecksum }
     ) as EvaluatedBaseline;
+    baseline.title = baselineName;
+    baseline.status = 'loaded';
+    if (benchmark) {
+      baseline.version = extractVersion(benchmark.version);
+      baseline.summary = stripHTML(extractText(benchmark.description));
+    }
     baselines.push(baseline);
 
     // Build target from TestResult, then enrich with ARF asset metadata
@@ -692,15 +676,12 @@ async function convertArfCollection(
 
   const hdf: HDFResults = {
     baselines,
-    generator: { name: 'xccdf-results-to-hdf', version: CONVERTER_VERSION },
+    generator: { name: 'xccdf-results-to-hdf', version: converterVersion },
     tool: { name: 'ARF', format: 'ARF' },
     components,
     timestamp: firstTimestamp ?? new Date(),
+    statistics: { duration: totalDuration },
   };
-
-  if (totalDuration > 0) {
-    hdf.statistics = { duration: totalDuration };
-  }
 
   return serializeHdf(hdf);
 }
@@ -807,52 +788,36 @@ function ruleResultToRequirement(
   const ruleId = rr.idref ?? '';
   const ruleDef = ruleIndex.get(ruleId);
 
-  const id = extractVersion(ruleDef?.version) || ruleId;
-  const title = extractText(ruleDef?.title) || id;
+  const id = ruleDef?.id ? extractRuleID(ruleDef.id) : ruleId;
+  const title = extractText(ruleDef?.title) || ruleId;
 
-  const severity = rr.severity ?? ruleDef?.severity ?? '';
+  const severity = (rr.severity || ruleDef?.severity || '').toLowerCase();
   const impact = severity ? severityToImpact(severity) : 0.5;
 
-  const descriptions: Description[] = [];
-  const rawDesc = extractText(ruleDef?.description);
-  if (rawDesc) {
-    descriptions.push({
-      label: 'default',
-      data: extractVulnDiscussion(rawDesc),
-    });
-  }
+  const descriptions: Description[] = [{
+    label: 'default',
+    data: stripHTML(extractVulnDiscussion(extractText(ruleDef?.description))),
+  }];
   const fixtext = extractFixtext(ruleDef?.fixtext);
   if (fixtext) {
-    descriptions.push({ label: 'fix', data: fixtext });
-  }
-  // descriptions requires minItems=1; guarantee a default when the rule
-  // definition carried neither a description nor a fixtext.
-  if (descriptions.length === 0) {
-    descriptions.push({ label: 'default', data: '' });
+    descriptions.push({ label: 'fix', data: stripHTML(fixtext) });
   }
 
-  const xccdfResult = (rr.result ?? '').toLowerCase();
-  const status = STATUS_MAP[xccdfResult] ?? ResultStatus.NotReviewed;
+  const xccdfResult = (rr.result ?? '').trim().toLowerCase();
+  const status = STATUS_MAP[xccdfResult] ?? ResultStatus.Error;
 
   // Prefer each rule-result's own @time (per-finding evaluation time), matching
   // the Go converter; fall back to the TestResult-level start-time (scanTime).
   const perRuleTime = rr.time ? parseTimestamp(rr.time) : null;
 
-  const result = createResult(status, '', {
-    codeDesc: `XCCDF rule ${id}`,
+  const result: RequirementResult = {
+    status,
+    codeDesc: `XCCDF rule ${ruleId}`,
     startTime: perRuleTime ?? scanTime,
-  }) as RequirementResult;
+  };
 
-  const tags: Record<string, unknown> = {};
-  let nistTags: string[] = [];
-  const cciIds = extractCCIs(rr.ident ?? ruleDef?.ident ?? []);
-  if (cciIds.length > 0) {
-    tags['cci'] = cciIds;
-    nistTags = [...new Set(cciIds.flatMap((cci) => getCCINistMappings(cci) ?? []))];
-    if (nistTags.length > 0) {
-      tags['nist'] = nistTags;
-    }
-  }
+  const tags = buildCciNistTags(extractCCIs([...(rr.ident ?? []), ...(ruleDef?.ident ?? [])]));
+  const nistTags = tags['nist'] as string[];
 
   const req = createRequirement(
     id,
@@ -912,7 +877,6 @@ function buildTargets(testResult: TestResultElement): Component[] {
   const target: Component = {
     name: targetName,
     type: TargetType.Host,
-        labels: {},
   };
 
   if (addresses.length > 0) {
@@ -920,6 +884,30 @@ function buildTargets(testResult: TestResultElement): Component[] {
   }
 
   return [target];
+}
+
+const NAMED_ENTITIES: Record<string, string> = {
+  lt: '<',
+  gt: '>',
+  quot: '"',
+  apos: "'",
+  amp: '&',
+};
+
+// The shared XML parser runs with processEntities off as XXE defense-in-depth,
+// so character references arrive undecoded; Go's encoding/xml decodes them for
+// free. STIG fix texts rely on this (an entity-encoded "<partition>" must
+// become a real tag before stripHTML can drop it). Only predefined and numeric
+// references are decoded; document-defined entities stay untouched.
+function decodeXmlEntities(s: string): string {
+  return s.replace(
+    /&(?:#(\d+)|#[xX]([0-9a-fA-F]+)|(lt|gt|quot|apos|amp));/g,
+    (match, dec: string | undefined, hex: string | undefined, name: string | undefined) => {
+      if (dec !== undefined) return String.fromCodePoint(Number.parseInt(dec, 10));
+      if (hex !== undefined) return String.fromCodePoint(Number.parseInt(hex, 16));
+      return name !== undefined ? NAMED_ENTITIES[name] ?? match : match;
+    },
+  );
 }
 
 /**
@@ -932,9 +920,9 @@ function extractText(
     return '';
   }
   if (typeof field === 'string') {
-    return field;
+    return decodeXmlEntities(field);
   }
-  return (field as TextElement)['#text'] ?? '';
+  return decodeXmlEntities((field as TextElement)['#text'] ?? '');
 }
 
 /**
@@ -962,9 +950,9 @@ function extractFixtext(
     return '';
   }
   if (typeof field === 'string') {
-    return field;
+    return decodeXmlEntities(field);
   }
-  return (field as FixtextElement)['#text'] ?? '';
+  return decodeXmlEntities((field as FixtextElement)['#text'] ?? '');
 }
 
 /**
@@ -981,20 +969,20 @@ function extractCheckContent(
     return '';
   }
   if (typeof cc === 'string') {
-    return cc;
+    return decodeXmlEntities(cc);
   }
   // check-content is forced into an array by ARRAY_TAGS — handle both cases
   if (Array.isArray(cc)) {
     const first = (cc as unknown[])[0];
     if (typeof first === 'string') {
-      return first;
+      return decodeXmlEntities(first);
     }
     if (first && typeof first === 'object' && '#text' in first) {
-      return (first as TextElement)['#text'] ?? '';
+      return decodeXmlEntities((first as TextElement)['#text'] ?? '');
     }
     return '';
   }
-  return (cc as TextElement)['#text'] ?? '';
+  return decodeXmlEntities((cc as TextElement)['#text'] ?? '');
 }
 
 /**
@@ -1006,27 +994,48 @@ function extractVulnDiscussion(description: string): string {
   const match = description.match(
     /<VulnDiscussion>([\s\S]*?)<\/VulnDiscussion>/
   );
-  if (match) {
-    return match[1]!.trim();
-  }
-  // Also handle HTML-entity-encoded tags from the XML parser
-  const entityMatch = description.match(
-    /&lt;VulnDiscussion&gt;([\s\S]*?)&lt;\/VulnDiscussion&gt;/
-  );
-  if (entityMatch) {
-    return entityMatch[1]!.trim();
-  }
-  return description;
+  return match ? match[1]! : description;
 }
 
 /**
- * Extract CCI identifiers from ident elements (system="http://cyber.mil/cci").
+ * Extract CCI identifiers from ident elements, deduplicated in first-seen order.
  */
 function extractCCIs(idents: IdentElement[]): string[] {
-  return idents
-    .filter((i) => i.system === CCI_SYSTEM)
+  const ccis = idents
+    .filter((i) => (i.system ?? '').toLowerCase().includes('cci'))
     .map((i) => i['#text'] ?? '')
     .filter((v) => v.length > 0);
+  return [...new Set(ccis)];
+}
+
+/**
+ * Build the cci/nist tag pair. `nist` is always present (empty when there are no
+ * CCIs) and sorted, matching Go's cci.CCIToNIST.
+ */
+function buildCciNistTags(cciIds: string[]): Record<string, unknown> {
+  if (cciIds.length === 0) {
+    return { nist: [] };
+  }
+  const nist = [...new Set(cciIds.flatMap((c) => getCCINistMappings(c) ?? []))].sort();
+  return { cci: cciIds, nist };
+}
+
+/**
+ * Extract the vulnerability ID from an XCCDF Rule ID:
+ * "SV-254238r991589_rule" and "xccdf_mil.disa.stig_rule_SV-204393r603261_rule"
+ * both yield "SV-254238"/"SV-204393". Non-SV IDs pass through unchanged.
+ */
+function extractRuleID(ruleID: string): string {
+  const svIdx = ruleID.toUpperCase().indexOf('SV-');
+  if (svIdx < 0) {
+    return ruleID;
+  }
+  const digits = ruleID.slice(svIdx + 3);
+  const revIdx = digits.indexOf('r');
+  if (revIdx > 0) {
+    return `SV-${digits.slice(0, revIdx)}`;
+  }
+  return `SV-${digits}`;
 }
 
 /**

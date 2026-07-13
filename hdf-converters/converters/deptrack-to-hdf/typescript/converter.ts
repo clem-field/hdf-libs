@@ -8,6 +8,7 @@ import type {
   EvaluatedBaseline,
   EvaluatedRequirement,
   Checksum,
+  RequirementResult,
 } from '@mitre/hdf-schema';
 import {
   ResultStatus,
@@ -15,7 +16,6 @@ import {
   VerificationMethodEnum,
   createMinimalBaseline,
   createRequirement,
-  createResult,
   type Description,
 } from '@mitre/hdf-schema';
 
@@ -176,11 +176,12 @@ function buildRequirement(finding: DeptrackFinding, timestamp: string | undefine
   // Build result: all findings are Failed
   const codeDesc = finding.vulnerability.recommendation ?? 'No recommendation available';
 
-  const results = [
-    createResult(ResultStatus.Failed, undefined, {
+  const results: RequirementResult[] = [
+    {
+      status: ResultStatus.Failed,
       codeDesc,
       startTime: (timestamp ? parseTimestamp(timestamp) : null) ?? new Date('0001-01-01T00:00:00Z'),
-    }),
+    },
   ];
 
   const req = createRequirement(
@@ -239,7 +240,7 @@ function buildAffectedPackageFromComponent(c: DeptrackComponent): ReturnType<typ
  * @param input - Dependency-Track FPF JSON string
  * @returns HDF JSON string
  */
-export async function convertDeptrackToHdf(input: string): Promise<string> {
+export async function convertDeptrackToHdf(input: string, converterVersion = '1.0.0'): Promise<string> {
   if (!input || input.trim().length === 0) {
     throw new Error('deptrack: empty input');
   }
@@ -288,7 +289,7 @@ export async function convertDeptrackToHdf(input: string): Promise<string> {
 
   return buildHdfResults({
     generatorName: 'deptrack-to-hdf',
-    converterVersion: '1.0.0',
+    converterVersion,
     toolName: 'Dependency-Track',
     toolFormat: 'JSON',
     baselines: [baseline],

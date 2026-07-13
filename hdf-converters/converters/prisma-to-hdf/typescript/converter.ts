@@ -6,7 +6,7 @@
  * Each finding maps to a single requirement with a single failed result.
  */
 
-import { parseCsv } from '@mitre/hdf-utilities';
+import { parseCsv, severityToImpact } from '@mitre/hdf-utilities';
 import {
   nistToCci,
   DEFAULT_STATIC_ANALYSIS_NIST_TAGS,
@@ -60,22 +60,13 @@ interface PrismaRecord {
  * Prisma uses non-standard severity names: "important" and "moderate"
  * in addition to the standard critical/high/medium/low.
  */
+const PRISMA_SEVERITY_ALIASES: Record<string, number> = {
+  important: 0.9,
+  moderate: 0.5,
+};
+
 function getImpact(severity: string): number {
-  switch (severity.toLowerCase()) {
-    case 'critical':
-      return 1.0;
-    case 'important':
-      return 0.9;
-    case 'high':
-      return 0.7;
-    case 'moderate':
-    case 'medium':
-      return 0.5;
-    case 'low':
-      return 0.3;
-    default:
-      return 0.5;
-  }
+  return PRISMA_SEVERITY_ALIASES[severity.toLowerCase()] ?? severityToImpact(severity);
 }
 
 /**
@@ -292,7 +283,7 @@ function buildBaseline(
  * @param input - Prisma Cloud CSV string
  * @returns HDF JSON string
  */
-export async function convertPrismaToHdf(input: string): Promise<string> {
+export async function convertPrismaToHdf(input: string, converterVersion = '1.0.0'): Promise<string> {
   if (!input || input.trim().length === 0) {
     throw new Error('prisma: empty input');
   }
@@ -340,7 +331,7 @@ export async function convertPrismaToHdf(input: string): Promise<string> {
 
   return buildHdfResults({
     generatorName: 'prisma-to-hdf',
-    converterVersion: '1.0.0',
+    converterVersion,
     toolName: 'Prisma Cloud',
     toolFormat: 'CSV',
     baselines,
