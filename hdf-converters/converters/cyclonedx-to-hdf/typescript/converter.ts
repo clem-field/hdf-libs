@@ -5,6 +5,7 @@ import {
 } from '@mitre/hdf-mappings';
 import { deriveControlTypeFromTags, inputChecksum, limitArray, mapCWEToNIST, validateInputSize, buildHdfResults } from '../../../shared/typescript/converterutil.js';
 import { parseBom, buildBom, BOMType, type BuildBomParts } from '../../../shared/typescript/bom/index.js';
+import { canonicalize } from '../../../shared/typescript/exportmap.js';
 import type {
   Component,
   EvaluatedBaseline,
@@ -14,6 +15,7 @@ import type {
 } from '@mitre/hdf-schema';
 import {
   ResultStatus,
+  createResult,
   TargetType,
   createMinimalBaseline,
   createRequirement,
@@ -318,11 +320,8 @@ export async function convertCyclonedxToHdf(input: string, converterVersion = '1
     // score but not status.
     const affects = vuln.affects ?? [];
     // CycloneDX carries no per-affect explanation, so results carry no message key.
-    const toResult = (codeDesc: string): RequirementResult => ({
-      status: ResultStatus.Failed,
-      codeDesc,
-      startTime: scanTime,
-    });
+    const toResult = (codeDesc: string): RequirementResult =>
+      createResult(ResultStatus.Failed, undefined, { codeDesc, startTime: scanTime });
     const results =
       affects.length > 0
         ? affects.map((affect) => toResult(formatCodeDesc(componentLookup, affect.ref)))
@@ -366,7 +365,9 @@ export async function convertCyclonedxToHdf(input: string, converterVersion = '1
     bomType: BOMType.Sbom,
     format: 'cyclonedx',
     uniqueId: parsedBom.normalized.uniqueId,
-    document: JSON.parse(input) as Record<string, unknown>,
+    // Sort keys in code-point order to match Go's json.Marshal, which sorts map
+    // keys — keeps the raw passthrough byte-identical across the two languages.
+    document: canonicalize(JSON.parse(input)) as Record<string, unknown>,
   };
   if (parsedBom.normalized.packages && parsedBom.normalized.packages.length > 0) {
     bomParts.packages = parsedBom.normalized.packages;
