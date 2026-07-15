@@ -34,7 +34,6 @@ path. Not real scan output — a structural scaffold only.
 DoD ACAS scans exercise two axes: vulnerability findings (CVSS v3, STIG/IAVM
 xrefs) and DISA STIG compliance audits. Both are covered here — the former by
 `sample.nessus` plus the converter's `cvss3_*` handling, the latter by
-`compliance.nessus`. A one-off check (2026-07) confirmed the converter turns two
-public ACAS-format sample scans into schema-valid HDF with CVSS v3 preserved.
-Real DoD ACAS exports were not available to commit as fixtures; a representative
-ACAS fixture is tracked as a follow-up.
+`compliance.nessus`. ACAS emits the same `NessusClientData_v2` schema as
+standalone Nessus, so no structural divergence is expected. No authoritative
+ACAS export is in the corpus yet; adding one is tracked as a follow-up.
