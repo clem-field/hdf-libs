@@ -22,6 +22,7 @@ HDF (Heimdall Data Format) is a standardized JSON format for security assessment
   - [generate](#generate) -- Generate InSpec profiles, thresholds, and baseline upgrades
   - [fetch](#fetch) -- Fetch from live APIs
     - [fetch aws-config](#fetch-aws-config) -- AWS Config compliance data
+    - [fetch aws-securityhub](#fetch-aws-securityhub) -- AWS Security Hub ASFF findings
     - [fetch gitlab](#fetch-gitlab) -- GitLab CI/CD security artifacts
     - [fetch sonarqube](#fetch-sonarqube) -- SonarQube issues
     - [fetch splunk](#fetch-splunk) -- Splunk HDF events
@@ -551,6 +552,94 @@ EXAMPLES
   hdf fetch aws-config --region us-east-1 | jq '.baselines[0].requirements | length'
 ```
 
+#### fetch aws-securityhub
+
+Fetch ASFF findings from AWS Security Hub and convert to HDF via the `asff-to-hdf` converter. Use `--check` to verify credentials without downloading findings.
+
+Credentials are resolved via the same AWS chain as `fetch aws-config` (env vars, `~/.aws/credentials` / `~/.aws/config`, IAM instance role, AssumeRole).
+
+```
+USAGE
+  hdf fetch aws-securityhub [output] [flags]
+
+FLAGS
+  -r, --region string       (required) AWS region (e.g., us-east-1)
+  -p, --profile string      AWS CLI named profile
+      --format string       Output format: hdf or raw (default "hdf")
+      --filter-json string  Path to a JSON file with an ASFF AwsSecurityFindingFilters object
+  -o, --output string       Output file path (default: stdout)
+      --check               Verify credentials only; skip findings download
+
+EXAMPLES
+  # Fetch all findings in a region
+  hdf fetch aws-securityhub --region us-east-1 output.json
+
+  # Use a named AWS CLI profile
+  hdf fetch aws-securityhub --region us-east-1 --profile my-audit-account output.json
+
+  # Save raw ASFF JSON instead of HDF
+  hdf fetch aws-securityhub --region us-east-1 --format raw asff.json
+
+  # Narrow the pull with a Security Hub filter (see "Filtering findings" below)
+  hdf fetch aws-securityhub --region us-east-1 --filter-json failed-only.json output.json
+
+  # Verify credentials only -- exits 0 on success, non-zero on auth failure
+  hdf fetch aws-securityhub --region us-east-1 --check
+```
+
+##### Filtering findings
+
+By default the fetch pulls every active finding, which on a busy account is a
+lot. `--filter-json` narrows it: point it at a file containing a Security Hub
+[`AwsSecurityFindingFilters`](https://docs.aws.amazon.com/securityhub/1.0/APIReference/API_AwsSecurityFindingFilters.html)
+object, which is passed straight to the [`GetFindings`](https://docs.aws.amazon.com/securityhub/1.0/APIReference/API_GetFindings.html)
+API. Each field is an array of matchers; **multiple values on one field OR
+together, and different fields AND together**. String matchers take a
+[`Comparison`](https://docs.aws.amazon.com/securityhub/1.0/APIReference/API_StringFilter.html)
+(`EQUALS`, `NOT_EQUALS`, `PREFIX`, `PREFIX_NOT_EQUALS`, `CONTAINS`, `NOT_CONTAINS`)
+and **values are case-sensitive**.
+
+Only failed compliance findings (the common "what needs remediation" pull):
+
+```json
+{ "ComplianceStatus": [{ "Value": "FAILED", "Comparison": "EQUALS" }] }
+```
+
+Only critical and high severity (OR within the field):
+
+```json
+{ "SeverityLabel": [
+    { "Value": "CRITICAL", "Comparison": "EQUALS" },
+    { "Value": "HIGH", "Comparison": "EQUALS" }
+] }
+```
+
+Active findings that are not resolved (AND across fields):
+
+```json
+{ "RecordState":    [{ "Value": "ACTIVE",   "Comparison": "EQUALS" }],
+  "WorkflowStatus": [{ "Value": "RESOLVED", "Comparison": "NOT_EQUALS" }] }
+```
+
+Findings updated in the last 7 days — the continuous-monitoring incremental pull
+(date fields take a `DateRange` in `DAYS` instead of a `Comparison`):
+
+```json
+{ "UpdatedAt": [{ "DateRange": { "Unit": "DAYS", "Value": 7 } }] }
+```
+
+Combined — failed criticals from the last 30 days:
+
+```json
+{ "ComplianceStatus": [{ "Value": "FAILED",   "Comparison": "EQUALS" }],
+  "SeverityLabel":    [{ "Value": "CRITICAL", "Comparison": "EQUALS" }],
+  "UpdatedAt":        [{ "DateRange": { "Unit": "DAYS", "Value": 30 } }] }
+```
+
+The [`AwsSecurityFindingFilters` reference](https://docs.aws.amazon.com/securityhub/1.0/APIReference/API_AwsSecurityFindingFilters.html)
+lists every filterable field (product, account, standard, resource type, and
+more) — `--filter-json` accepts any of them.
+
 #### fetch gitlab
 
 Fetch a GitLab CI/CD security scan artifact (SAST, DAST, secret detection, etc.) and convert to HDF.
@@ -678,6 +767,7 @@ These flags apply to all commands.
 
 | Source Format | Aliases | Description |
 |--------------|---------|-------------|
+| `asff` | | AWS Security Finding Format — Security Hub / AWS-integrated tool findings (JSON) |
 | `aws-config` | | AWS Config compliance evaluation results (JSON) |
 | `burpsuite` | | PortSwigger BurpSuite web scanner (XML) |
 | `checkov` | | Checkov IaC static analysis (JSON) |
