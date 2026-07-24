@@ -327,7 +327,6 @@ func getRegion(arn string) string {
 	return m[1]
 }
 
-// buildCheckText creates the "check" description content with ARN, source identifier, and params.
 // buildFixText builds the "fix" description from a rule's attached remediation
 // configuration (the SSM Automation document Config runs). Empty when the rule
 // carries no remediation, so the fix description is omitted rather than fabricated.
@@ -358,6 +357,7 @@ func remediationTargetLabel(targetType string) string {
 	return targetType + " document"
 }
 
+// buildCheckText creates the "check" description content with ARN, source identifier, and params.
 func buildCheckText(rule ConfigRule) string {
 	parts := []string{
 		fmt.Sprintf("ARN: %s", strOrNA(rule.ConfigRuleArn)),

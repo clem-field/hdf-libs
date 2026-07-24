@@ -396,7 +396,10 @@ function trivyMessage(f: AsffFinding): string {
     const patchMsg = patched
       ? `The package has been patched since version(s): ${patched}.`
       : 'There is no patched version of the package.';
-    return `For package ${o['PkgName']}, the current version that is installed is ${o['Installed Package']}.  ${patchMsg}`;
+    // Coalesce to '' so a missing key renders empty (matching Go), not "undefined".
+    const pkg = o['PkgName'] ?? '';
+    const installed = o['Installed Package'] ?? '';
+    return `For package ${pkg}, the current version that is installed is ${installed}.  ${patchMsg}`;
   }
   if (o['Message']) {
     const loc = trivyLocation(o);

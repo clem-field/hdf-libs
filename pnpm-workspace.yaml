@@ -33,5 +33,6 @@ overrides:
   "fflate@0.8.3": "0.8.2"
 auditConfig:
   ignoreGhsas:
-    - "GHSA-gv7w-rqvm-qjhr"
+    # GHSA-fx2h-pf6j-xcff — vite (transitive under vitepress 1.x); clears when
+    # vitepress moves to 2.x (tracked: hdf-libs-34nl).
     - "GHSA-fx2h-pf6j-xcff"
