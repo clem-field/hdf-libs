@@ -25,6 +25,7 @@ import {
   convertHdfToXml,
   convertGitlabToHdf,
   convertTrufflehogToHdf,
+  convertHipcheckToHdf,
   convertBurpsuiteToHdf,
   convertDbprotectToHdf,
   convertTwistlockToHdf,
@@ -198,6 +199,11 @@ describe('Main exports', () => {
   it('should export convertTrufflehogToHdf from main index', () => {
     expect(convertTrufflehogToHdf).toBeDefined();
     expect(typeof convertTrufflehogToHdf).toBe('function');
+  });
+
+  it('should export convertHipcheckToHdf from main index', () => {
+    expect(convertHipcheckToHdf).toBeDefined();
+    expect(typeof convertHipcheckToHdf).toBe('function');
   });
 
   it('should export convertJfrogXrayToHdf from main index', () => {
