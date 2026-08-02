@@ -109,6 +109,24 @@ interface CheckWithType {
 }
 
 /**
+ * Renders checkov's code_block ([[lineno, "source"], ...]) into a readable,
+ * line-numbered source snippet for the Heimdall CODE tab. Returns undefined when
+ * the code_block is absent or not an array so requirement.code is omitted.
+ */
+function renderCodeBlock(codeBlock: unknown): string | undefined {
+  if (!Array.isArray(codeBlock)) return undefined;
+  const lines: string[] = [];
+  for (const entry of codeBlock) {
+    if (!Array.isArray(entry) || entry.length < 2) continue;
+    const lineno = entry[0];
+    const src = typeof entry[1] === 'string' ? entry[1] : '';
+    const trimmed = src.endsWith('\n') ? src.slice(0, -1) : src;
+    lines.push(`${lineno} ${trimmed}`);
+  }
+  return lines.length ? lines.join('\n') : undefined;
+}
+
+/**
  * Converts a group of checks sharing a check_id into one EvaluatedRequirement.
  */
 function buildRequirement(checkId: string, group: CheckWithType[], scanTime: Date): EvaluatedRequirement {
@@ -137,6 +155,11 @@ function buildRequirement(checkId: string, group: CheckWithType[], scanTime: Dat
 
   const req = createRequirement(checkId, rep.check_name, descriptions, impact, results, { tags }) as EvaluatedRequirement;
   req.verificationMethod = VerificationMethodEnum.Automated;
+
+  const code = renderCodeBlock(rep.code_block);
+  if (code !== undefined) {
+    req.code = code;
+  }
 
   const controlType = deriveControlTypeFromTags([...DEFAULT_STATIC_ANALYSIS_NIST_TAGS]);
   if (controlType !== undefined) {
