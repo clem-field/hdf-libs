@@ -21,6 +21,9 @@
 //
 //    hDFEvidencePackage, err := UnmarshalHDFEvidencePackage(bytes)
 //    bytes, err = hDFEvidencePackage.Marshal()
+//
+//    hDFRequirementChangeEvent, err := UnmarshalHDFRequirementChangeEvent(bytes)
+//    bytes, err = hDFRequirementChangeEvent.Marshal()
 
 package hdf
 
@@ -100,45 +103,59 @@ func (r *HDFEvidencePackage) Marshal() ([]byte, error) {
 	return json.Marshal(r)
 }
 
+func UnmarshalHDFRequirementChangeEvent(data []byte) (HDFRequirementChangeEvent, error) {
+	var r HDFRequirementChangeEvent
+	err := json.Unmarshal(data, &r)
+	return r, err
+}
+
+func (r *HDFRequirementChangeEvent) Marshal() ([]byte, error) {
+	return json.Marshal(r)
+}
+
 // The top level value containing all assessment results.
 type HDFResults struct {
-	// Information on the baselines that were evaluated, including findings.                                          
-	Baselines                                                                                  []EvaluatedBaseline    `json:"baselines"`
-	// The components that were assessed. Each component describes a system element (host,                            
-	// container, cloud resource, application, etc.) with optional identity, SBOM, and external                       
-	// references.                                                                                                    
-	Components                                                                                 []Component            `json:"components,omitempty"`
-	// Reserved for tool-specific data not defined in the HDF standard. Use this to preserve                          
-	// original tool output, auxiliary data, or custom metadata.                                                      
-	Extensions                                                                                 map[string]interface{} `json:"extensions,omitempty"`
-	// Optional references to external artifacts (CTI/STIX, BOMs, advisories, runbooks, or any                        
-	// URI-addressable artifact) relevant to this assessment as a whole. Inert context; see                           
-	// External_Reference.                                                                                            
-	ExternalReferences                                                                         []ExternalReference    `json:"externalReferences,omitempty"`
-	// Information about the tool that generated this file.                                                           
-	Generator                                                                                  *Generator             `json:"generator,omitempty"`
-	// Unique identifier for this assessment run.                                                                     
-	ID                                                                                         *string                `json:"id,omitempty"`
-	// Cryptographic integrity information for verifying this file.                                                   
-	Integrity                                                                                  *Integrity             `json:"integrity,omitempty"`
-	// Reference to an hdf-plan document describing the assessment plan that produced these                           
-	// results. May be a relative path, absolute URI, or fragment identifier.                                         
-	PlanRef                                                                                    *string                `json:"planRef,omitempty"`
-	// Optional reference to automated remediation resources (Ansible playbooks, Terraform                            
-	// scripts, etc.) for fixing failing requirements found in this assessment.                                       
-	Remediation                                                                                *Remediation           `json:"remediation,omitempty"`
-	// Information about the test execution environment where the security tool was run.                              
-	// Distinct from targets (what is being tested).                                                                  
-	Runner                                                                                     *Runner                `json:"runner,omitempty"`
-	// Statistics for the assessment run, including duration and result counts.                                       
-	Statistics                                                                                 *Statistics            `json:"statistics,omitempty"`
-	// Reference to an hdf-system document describing the system under assessment. May be a                           
-	// relative path, absolute URI, or fragment identifier.                                                           
-	SystemRef                                                                                  *string                `json:"systemRef,omitempty"`
-	// When this assessment was executed.                                                                             
-	Timestamp                                                                                  *time.Time             `json:"timestamp,omitempty"`
-	// The security tool that produced the assessment data in this file.                                              
-	Tool                                                                                       *Tool                  `json:"tool,omitempty"`
+	// Information on the baselines that were evaluated, including findings.                                           
+	Baselines                                                                                   []EvaluatedBaseline    `json:"baselines"`
+	// The components that were assessed. Each component describes a system element (host,                             
+	// container, cloud resource, application, etc.) with optional identity, SBOM, and external                        
+	// references.                                                                                                     
+	Components                                                                                  []Component            `json:"components,omitempty"`
+	// Present ONLY on reconciled result sets: lineage recording the seed snapshot and event                           
+	// watermark this document was reassembled from (ADR-0005). Documents produced directly by a                       
+	// scan omit this field. When present, generator names the reconciling tool.                                       
+	Derivation                                                                                  *Derivation            `json:"derivation,omitempty"`
+	// Reserved for tool-specific data not defined in the HDF standard. Use this to preserve                           
+	// original tool output, auxiliary data, or custom metadata.                                                       
+	Extensions                                                                                  map[string]interface{} `json:"extensions,omitempty"`
+	// Optional references to external artifacts (CTI/STIX, BOMs, advisories, runbooks, or any                         
+	// URI-addressable artifact) relevant to this assessment as a whole. Inert context; see                            
+	// External_Reference.                                                                                             
+	ExternalReferences                                                                          []ExternalReference    `json:"externalReferences,omitempty"`
+	// Information about the tool that generated this file.                                                            
+	Generator                                                                                   *Generator             `json:"generator,omitempty"`
+	// Unique identifier for this assessment run.                                                                      
+	ID                                                                                          *string                `json:"id,omitempty"`
+	// Cryptographic integrity information for verifying this file.                                                    
+	Integrity                                                                                   *Integrity             `json:"integrity,omitempty"`
+	// Reference to an hdf-plan document describing the assessment plan that produced these                            
+	// results. May be a relative path, absolute URI, or fragment identifier.                                          
+	PlanRef                                                                                     *string                `json:"planRef,omitempty"`
+	// Optional reference to automated remediation resources (Ansible playbooks, Terraform                             
+	// scripts, etc.) for fixing failing requirements found in this assessment.                                        
+	Remediation                                                                                 *Remediation           `json:"remediation,omitempty"`
+	// Information about the test execution environment where the security tool was run.                               
+	// Distinct from targets (what is being tested).                                                                   
+	Runner                                                                                      *Runner                `json:"runner,omitempty"`
+	// Statistics for the assessment run, including duration and result counts.                                        
+	Statistics                                                                                  *Statistics            `json:"statistics,omitempty"`
+	// Reference to an hdf-system document describing the system under assessment. May be a                            
+	// relative path, absolute URI, or fragment identifier.                                                            
+	SystemRef                                                                                   *string                `json:"systemRef,omitempty"`
+	// When this assessment was executed.                                                                              
+	Timestamp                                                                                   *time.Time             `json:"timestamp,omitempty"`
+	// The security tool that produced the assessment data in this file.                                               
+	Tool                                                                                        *Tool                  `json:"tool,omitempty"`
 }
 
 // Information on a baseline that was evaluated, including any findings.
@@ -391,6 +408,14 @@ type EvaluatedRequirement struct {
 	// riskAdjustment) or what remediation is being tracked (poam). Absent when no overrides or                         
 	// POAMs apply.                                                                                                     
 	Disposition                                                                                 *OverrideType           `json:"disposition,omitempty"`
+	// Checksum of this requirement's resolved effective posture, for per-control change                                
+	// detection in continuous monitoring. sha256 over the canonical JSON object with keys                              
+	// status, impact, disposition (in that order), holding the resolved effective status,                              
+	// resolved effective impact, and governing override type (null when nothing governs), with                         
+	// override expiry anchored to the document timestamp. Flips exactly when the operative                             
+	// status, impact, or disposition changes; stable under all other churn (result details,                            
+	// timestamps, tags). Optional; stamped by tooling (hdf convert, hdf amend apply).                                  
+	EffectiveChecksum                                                                           *Checksum               `json:"effectiveChecksum,omitempty"`
 	// The current effective impact score (0.0–1.0) after applying the most recent non-expired                          
 	// override with an impact field. Absent when no impact overrides apply; consumers should                           
 	// use the requirement's impact field in that case.                                                                 
@@ -1147,6 +1172,37 @@ type InputOverride struct {
 	Justification                                                                              *string     `json:"justification,omitempty"`
 	// The overridden value. Should match the type of the original input.                                  
 	Value                                                                                      interface{} `json:"value"`
+}
+
+// Derived-document lineage for a reconciled result set (an hdf-results produced by
+// applyChangeEvents rather than a scanner). Records exactly which seed and event horizon the
+// document represents so it can never masquerade as primary scan evidence. Conceptually PROV
+// qualified derivation: derived entity, used entity (seed), activity (event application),
+// generation time (asOf).
+type Derivation struct {
+	// The posture-as-of time of this reconciled view (RFC 3339, trimmed UTC) — the analog of           
+	// PROV's generatedAtTime.                                                                          
+	AsOf                                                                                      time.Time `json:"asOf"`
+	// Number of change events applied to the seed to produce this document.                            
+	EventsApplied                                                                             int64     `json:"eventsApplied"`
+	// The authoritative snapshot this document was reassembled from, pinned by content.                
+	Seed                                                                                      Seed      `json:"seed"`
+	// URI of the event-stream producer context whose events were applied (matches the events'          
+	// envelope source).                                                                                
+	Source                                                                                    string    `json:"source"`
+	// The event watermark: the highest per-key sequence number applied. Downstream precedence          
+	// rule: a full-scan document supersedes the reconciled view as of its scan time; between           
+	// scans, the reconciled document with the highest throughSequence is the current posture.          
+	ThroughSequence                                                                           int64     `json:"throughSequence"`
+}
+
+// The authoritative snapshot this document was reassembled from, pinned by content.
+type Seed struct {
+	// Checksum of the seed snapshot, REQUIRED: the derivation pins an immutable snapshot by         
+	// content, not just location.                                                                   
+	Checksum                                                                                Checksum `json:"checksum"`
+	// URI to the seed snapshot document (relative path or absolute URL).                            
+	URI                                                                                     string   `json:"uri"`
 }
 
 // Information about the tool that generated this HDF file.
@@ -2103,6 +2159,70 @@ type ExternalEvidenceTimeRange struct {
 	Start                                                    *time.Time `json:"start,omitempty"`
 }
 
+// A single continuous-monitoring wire event: one requirement's effective posture changed on one
+// system component. The streaming increment of a systemDrift hdf-comparison — events fold into
+// comparisons and reassemble into hdf-results, they never mutate documents in place. One event per
+// wire document (NDJSON-friendly). The envelope (identity, ordering, hash chain) is the shared
+// Change_Event_Envelope primitive; the payload carries the producer-computable change state, a thin
+// before projection, and the full after requirement (the evidence a responder opens the event for).
+// Design: ADR-0005.
+type HDFRequirementChangeEvent struct {
+	// The full requirement as evaluated after the change — required and non-null for every                           
+	// state except absent (null there: the requirement left the assessment scope). Full content                      
+	// is load-bearing twice over: reassembly parity (applyChangeEvents cannot reproduce changed                      
+	// result content from a projection) and triage (the failing results[] ARE the 'why' a                            
+	// responder opens the event for).                                                                                
+	After                                                                                       interface{}           `json:"after"`
+	// Thin projection of the prior effective posture, for at-a-glance alerting without a                             
+	// state-store lookup. Null exactly when state is new (no prior posture exists). The full                         
+	// prior state is recoverable from the consumer's materialized state; the envelope's                              
+	// priorChecksum covers the integrity of that recovery.                                                           
+	Before                                                                                      interface{}           `json:"before"`
+	// Why the state changed. An overrideExpired flip is a different triage than resultChanged:                       
+	// the control did not get worse, a waiver lapsed.                                                                
+	ChangeReasons                                                                               []EventChangeReason   `json:"changeReasons,omitempty"`
+	// Canonical requirement identifier — the same identity as Requirement_Diff.id and the                            
+	// requirement's id in hdf-results. Together with the envelope's (systemRef, componentId)                         
+	// this forms the durable entity key. A requirement renumbering is emitted as absent + new                        
+	// under the two keys, never an in-place key change; batch comparison reconciles renames via                      
+	// its oldId/newId matching.                                                                                      
+	RequirementID                                                                               string                `json:"requirementId"`
+	// The producer-computable subset of Requirement_State: new | absent | updated | fixed |                          
+	// regressed. fixed and regressed carry the direction SARIF's baselineState lacks; project                        
+	// down to SARIF's closed 4 values for external interop.                                                          
+	State                                                                                       EventRequirementState `json:"state"`
+	// componentId of the system component this event concerns.                                                       
+	ComponentID                                                                                 string                `json:"componentId"`
+	// Identity of this event occurrence, unique per source. (source, eventId) is the                                 
+	// deduplication key: consumers may treat events with identical source and eventId as                             
+	// duplicates. UUIDv7 (time-ordered) is recommended but not required.                                             
+	EventID                                                                                     string                `json:"eventId"`
+	// The effectiveChecksum of the entity state this event supersedes, forming a per-key hash                        
+	// chain: a mismatch or gap against stored state is detectable, letting a consumer mark the                       
+	// key unverified instead of serving stale posture. Null at chain start (no prior state,                          
+	// e.g. a new entity or the first event after a seed). The chain provides tamper/gap                              
+	// evidence given a trusted head; completeness is anchored out-of-band by periodic                                
+	// re-centering rescans.                                                                                          
+	PriorChecksum                                                                               interface{}           `json:"priorChecksum"`
+	// The versioned schema $id this event validates against, so events self-describe on                              
+	// heterogeneous streams. Recommended on every wire event.                                                        
+	SchemaRef                                                                                   *string               `json:"schemaRef,omitempty"`
+	// Monotonically increasing sequence number per entity key. The ONLY ordering authority for                       
+	// folding: consumers keep the greatest sequence per key regardless of arrival order or                           
+	// timestamp. Deliberately per-entity-key (event-sourcing aggregate-version practice) rather                      
+	// than per-source.                                                                                               
+	Sequence                                                                                    int64                 `json:"sequence"`
+	// URI identifying the producer context that emitted this event (for example, a scanner                           
+	// instance and profile). eventId uniqueness and sequence numbering are scoped per source.                        
+	Source                                                                                      string                `json:"source"`
+	// URI to the hdf-system document (authorization boundary) this event applies to. Resolves                        
+	// to the latest version of the evolving system document.                                                         
+	SystemRef                                                                                   string                `json:"systemRef"`
+	// Occurrence time of the observed change (RFC 3339, trimmed UTC). Display and audit                              
+	// metadata only — NEVER an ordering key; ordering is sequence's job.                                             
+	Timestamp                                                                                   time.Time             `json:"timestamp"`
+}
+
 // The type of identifier. Use 'email' for email addresses, 'username' for user accounts,
 // 'system' for deterministic non-interactive automation (CI jobs, cron, scanners), 'agent'
 // for an AI/LLM agent acting with autonomy — kept distinct from 'system' so auditors can
@@ -2465,18 +2585,18 @@ const (
 type ChangeReason string
 
 const (
-	BaselineUpgraded ChangeReason = "baselineUpgraded"
-	ConfigChanged    ChangeReason = "configChanged"
-	ControlMapped    ChangeReason = "controlMapped"
-	ImpactChanged    ChangeReason = "impactChanged"
-	MetadataChanged  ChangeReason = "metadataChanged"
-	OverrideAdded    ChangeReason = "overrideAdded"
-	OverrideExpired  ChangeReason = "overrideExpired"
-	OverrideModified ChangeReason = "overrideModified"
-	OverrideRemoved  ChangeReason = "overrideRemoved"
-	ResultChanged    ChangeReason = "resultChanged"
-	ScannerChanged   ChangeReason = "scannerChanged"
-	TargetChanged    ChangeReason = "targetChanged"
+	BaselineUpgraded             ChangeReason = "baselineUpgraded"
+	ChangeReasonConfigChanged    ChangeReason = "configChanged"
+	ChangeReasonImpactChanged    ChangeReason = "impactChanged"
+	ChangeReasonOverrideAdded    ChangeReason = "overrideAdded"
+	ChangeReasonOverrideExpired  ChangeReason = "overrideExpired"
+	ChangeReasonOverrideModified ChangeReason = "overrideModified"
+	ChangeReasonOverrideRemoved  ChangeReason = "overrideRemoved"
+	ChangeReasonResultChanged    ChangeReason = "resultChanged"
+	ControlMapped                ChangeReason = "controlMapped"
+	MetadataChanged              ChangeReason = "metadataChanged"
+	ScannerChanged               ChangeReason = "scannerChanged"
+	TargetChanged                ChangeReason = "targetChanged"
 )
 
 // How a conflict between multiple scanner results was resolved.
@@ -2510,12 +2630,12 @@ const (
 type RequirementState string
 
 const (
-	Fixed                     RequirementState = "fixed"
 	Moved                     RequirementState = "moved"
-	Regressed                 RequirementState = "regressed"
 	RequirementStateAbsent    RequirementState = "absent"
+	RequirementStateFixed     RequirementState = "fixed"
 	RequirementStateMerged    RequirementState = "merged"
 	RequirementStateNew       RequirementState = "new"
+	RequirementStateRegressed RequirementState = "regressed"
 	RequirementStateUnchanged RequirementState = "unchanged"
 	RequirementStateUpdated   RequirementState = "updated"
 	Split                     RequirementState = "split"
@@ -2625,6 +2745,36 @@ const (
 	HdfPlan       ContentType = "hdf-plan"
 	HdfResults    ContentType = "hdf-results"
 	HdfSystem     ContentType = "hdf-system"
+)
+
+// The producer-computable subset of the comparison vocabulary's Change_Reason, value-identical with
+// the parent enum (test-enforced). Batch-only reasons (baselineUpgraded, controlMapped,
+// scannerChanged, targetChanged, metadataChanged) require cross-corpus context and are excluded.
+type EventChangeReason string
+
+const (
+	EventChangeReasonConfigChanged    EventChangeReason = "configChanged"
+	EventChangeReasonImpactChanged    EventChangeReason = "impactChanged"
+	EventChangeReasonOverrideAdded    EventChangeReason = "overrideAdded"
+	EventChangeReasonOverrideExpired  EventChangeReason = "overrideExpired"
+	EventChangeReasonOverrideModified EventChangeReason = "overrideModified"
+	EventChangeReasonOverrideRemoved  EventChangeReason = "overrideRemoved"
+	EventChangeReasonResultChanged    EventChangeReason = "resultChanged"
+)
+
+// The producer-computable subset of the comparison vocabulary's Requirement_State. Kept
+// value-identical with the parent enum (test-enforced): the batch-only states (moved, split,
+// merged) are outputs of cross-document identity resolution a per-key producer cannot compute.
+// Declared as a distinct named type (rather than a $ref intersection) so generated Go/TS types keep
+// stable, distinct enum names.
+type EventRequirementState string
+
+const (
+	EventRequirementStateAbsent    EventRequirementState = "absent"
+	EventRequirementStateFixed     EventRequirementState = "fixed"
+	EventRequirementStateNew       EventRequirementState = "new"
+	EventRequirementStateRegressed EventRequirementState = "regressed"
+	EventRequirementStateUpdated   EventRequirementState = "updated"
 )
 
 type Ref struct {

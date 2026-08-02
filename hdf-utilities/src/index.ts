@@ -58,6 +58,7 @@ export {
   STATUS_SEVERITY_ORDER,
   statusRank,
   worstStatus,
+  governingOverrideIndex,
   governingStatusOverride,
   governingStatusOverrideIndex,
   computeEffectiveStatus,
