@@ -11,6 +11,7 @@ import type {
   EvaluatedBaseline,
   EvaluatedRequirement,
   Checksum,
+  Reference,
 } from '@mitre/hdf-schema';
 import {
   ResultStatus,
@@ -220,6 +221,17 @@ function buildCodeDesc(vuln: NeuVectorVuln): string {
 }
 
 /**
+ * Emits a single external Reference for the vulnerability's advisory link.
+ * Returns undefined when the source carries no link so refs[] is omitted.
+ */
+function buildRefs(vuln: NeuVectorVuln): Reference[] | undefined {
+  if (!vuln.link) {
+    return undefined;
+  }
+  return [{ url: vuln.link }];
+}
+
+/**
  * Builds a single EvaluatedRequirement from a NeuVector vulnerability.
  */
 function buildRequirement(vuln: NeuVectorVuln, scanTime: Date): EvaluatedRequirement {
@@ -235,6 +247,10 @@ function buildRequirement(vuln: NeuVectorVuln, scanTime: Date): EvaluatedRequire
 
   if (cveIDs.length > 0) {
     tags['cve'] = cveIDs;
+  }
+
+  if (vuln.feed_rating) {
+    tags['feed_rating'] = vuln.feed_rating;
   }
 
   const descriptions: Description[] = [
@@ -268,6 +284,10 @@ function buildRequirement(vuln: NeuVectorVuln, scanTime: Date): EvaluatedRequire
   const cvss = buildCvssEntries(vuln);
   if (cvss.length > 0) {
     req.cvss = cvss;
+  }
+  const refs = buildRefs(vuln);
+  if (refs) {
+    req.refs = refs;
   }
 
   // NeuVector scans container images; the package ecosystem isn't

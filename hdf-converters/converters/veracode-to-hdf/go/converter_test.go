@@ -100,6 +100,65 @@ func TestConvertVeracodeToHDF_CWEControls(t *testing.T) {
 	assert.Greater(t, len(cweControl.Descriptions), 0, "Should have descriptions")
 }
 
+func TestConvertVeracodeToHDF_StandardsTags(t *testing.T) {
+	input := loadFixture(t, "veracode.xml")
+
+	result, err := ConvertVeracodeToHDF(input, testConverterVersion)
+	require.NoError(t, err)
+	require.Len(t, result.Baselines, 1)
+	reqs := result.Baselines[0].Requirements
+
+	findReq := func(id string) *hdf.EvaluatedRequirement {
+		for i := range reqs {
+			if reqs[i].ID == id {
+				return &reqs[i]
+			}
+		}
+		return nil
+	}
+
+	// Category 18 ("Command or Argument Injection") has one CWE (78) carrying
+	// five of the six standards cross-references. Each becomes a discrete tag.
+	cat18 := findReq("18")
+	require.NotNil(t, cat18, "Should have CWE control with categoryid 18")
+	assert.Equal(t, []string{"1347"}, cat18.Tags["owasp"], "owasp tag")
+	assert.Equal(t, []string{"864"}, cat18.Tags["sans"], "sans tag")
+	assert.Equal(t, []string{"1165"}, cat18.Tags["certc"], "certc tag")
+	assert.Equal(t, []string{"875"}, cat18.Tags["certcpp"], "certcpp tag")
+	assert.Equal(t, []string{"1134"}, cat18.Tags["certjava"], "certjava tag")
+
+	// owaspmobile is absent from every fixture CWE (NOT-IN-SOURCE): key omitted.
+	_, hasMobile := cat18.Tags["owaspmobile"]
+	assert.False(t, hasMobile, "owaspmobile tag should be omitted when absent")
+
+	// Category 7 ("API Abuse") has a CWE (245) with no standards attributes:
+	// none of the discrete standards keys should be present.
+	cat7 := findReq("7")
+	require.NotNil(t, cat7, "Should have CWE control with categoryid 7")
+	for _, key := range []string{"owasp", "sans", "certc", "certcpp", "certjava", "owaspmobile"} {
+		_, ok := cat7.Tags[key]
+		assert.Falsef(t, ok, "%s tag should be omitted when no CWE carries it", key)
+	}
+}
+
+func TestConvertVeracodeToHDF_StandardsTagsDedup(t *testing.T) {
+	input := loadFixture(t, "veracode.xml")
+
+	result, err := ConvertVeracodeToHDF(input, testConverterVersion)
+	require.NoError(t, err)
+	require.Len(t, result.Baselines, 1)
+
+	// Category 21 ("CRLF Injection") has three CWEs whose owasp attrs are
+	// 1347, 1347, 1355 — distinct values collapse to two in appearance order.
+	for _, req := range result.Baselines[0].Requirements {
+		if req.ID == "21" {
+			assert.Equal(t, []string{"1347", "1355"}, req.Tags["owasp"], "distinct owasp values in appearance order")
+			return
+		}
+	}
+	t.Fatal("Should have CWE control with categoryid 21")
+}
+
 func TestConvertVeracodeToHDF_CVEControls(t *testing.T) {
 	input := loadFixture(t, "veracode.xml")
 
@@ -639,6 +698,72 @@ func TestBuildVeracodeCvss(t *testing.T) {
 	t.Run("non-numeric score yields no entry", func(t *testing.T) {
 		assert.Nil(t, buildVeracodeCvss(Vulnerability{CVSSScore: "not-a-number"}, nil))
 	})
+}
+
+// A static CWE requirement carries its flaws' remediation_status as a
+// requirement-level description labeled "remediation_status". In the fixture
+// every flaw is "New".
+func TestConvertVeracodeToHDF_RemediationStatus(t *testing.T) {
+	input := loadFixture(t, "veracode.xml")
+	result, err := ConvertVeracodeToHDF(input, testConverterVersion)
+	require.NoError(t, err)
+	require.NotEmpty(t, result.Baselines)
+
+	var cweControl *hdf.EvaluatedRequirement
+	for i := range result.Baselines[0].Requirements {
+		if result.Baselines[0].Requirements[i].ID == "18" {
+			cweControl = &result.Baselines[0].Requirements[i]
+			break
+		}
+	}
+	require.NotNil(t, cweControl, "expected CWE control 18")
+
+	var found *hdf.Description
+	for i := range cweControl.Descriptions {
+		if cweControl.Descriptions[i].Label == "remediation_status" {
+			found = &cweControl.Descriptions[i]
+			break
+		}
+	}
+	require.NotNil(t, found, "CWE requirement should carry a remediation_status description")
+	assert.Equal(t, "New", found.Data)
+}
+
+// formatRemediationStatus branch coverage: distinct collection, and the
+// absent case (no flaw carries the field) yielding "" so no description is
+// emitted.
+func TestFormatRemediationStatus(t *testing.T) {
+	t.Run("distinct values in order", func(t *testing.T) {
+		cwes := []CWE{{StaticFlaws: StaticFlaws{Flaws: []Flaw{
+			{RemediationStatus: "New"},
+			{RemediationStatus: "New"},
+			{RemediationStatus: "Fixed"},
+		}}}}
+		assert.Equal(t, "New\nFixed", formatRemediationStatus(cwes))
+	})
+
+	t.Run("absent yields empty", func(t *testing.T) {
+		cwes := []CWE{{StaticFlaws: StaticFlaws{Flaws: []Flaw{{IssueID: "1"}}}}}
+		assert.Empty(t, formatRemediationStatus(cwes))
+	})
+}
+
+// A CWE requirement whose flaws carry no remediation_status emits no
+// remediation_status description (the absent branch).
+func TestBuildCWERequirement_NoRemediationStatus(t *testing.T) {
+	cat := Category{
+		CategoryID:   "99",
+		CategoryName: "No Status",
+		CWEs: []CWE{{
+			CWEID:       "78",
+			StaticFlaws: StaticFlaws{Flaws: []Flaw{{IssueID: "1", Severity: "5"}}},
+		}},
+	}
+	req := buildCWERequirement(cat, 0.9, "")
+	for _, d := range req.Descriptions {
+		assert.NotEqual(t, "remediation_status", d.Label,
+			"requirement with no remediation_status flaw must not emit the description")
+	}
 }
 
 func TestConvertVeracodeToHDF_VerificationMethod(t *testing.T) {
