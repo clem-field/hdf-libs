@@ -66,10 +66,12 @@ func TestConvertDefectDojo_StatusMapping(t *testing.T) {
 	active := requirementByTriage(t, reqs, "defectdojo/active")
 	assert.Equal(t, hdf.Failed, active.Results[0].Status)
 
-	// false_p → failed (raw-primary; dismissal rides in the tag, not the status)
+	// false_p → raw stays failed; the dismissal rides in a falsePositive override
+	// (effectiveStatus notApplicable), not a rewrite of the raw status.
 	fp := requirementByTriage(t, reqs, "defectdojo/false_p")
 	assert.Equal(t, hdf.Failed, fp.Results[0].Status)
-	assert.Nil(t, fp.EffectiveStatus, "false positive is not an override")
+	require.NotNil(t, fp.EffectiveStatus)
+	assert.Equal(t, hdf.NotApplicable, *fp.EffectiveStatus)
 
 	// is_mitigated → passed (only when it is not also false_p/risk_accepted)
 	// finding 3 in the fixture is mitigated-only.
@@ -112,6 +114,104 @@ func TestConvertDefectDojo_RiskAcceptanceWaiverOverride(t *testing.T) {
 	assert.Equal(t, hdf.Simple, ov.AppliedBy.Type)
 	assert.Equal(t, 2099, ov.ExpiresAt.Year()) // real expiration_date
 	assert.False(t, ov.AppliedAt.IsZero())
+}
+
+// TestConvertDefectDojo_FalsePositiveOverride pins the falsePositive override
+// reconstructed from a DefectDojo false-positive dismissal (finding 2 in the
+// fixture: false_p=true, mitigated_by=1, mitigated=2026-07-26). Raw status stays
+// failed; effectiveStatus becomes notApplicable (a vuln aggregator's FP means the
+// vuln does not apply), fully attributed to the reviewer.
+func TestConvertDefectDojo_FalsePositiveOverride(t *testing.T) {
+	result, err := ConvertDefectDojo(loadFixture(t, "findings.json"), converterVersion)
+	require.NoError(t, err)
+	reqs := result.Baselines[0].Requirements
+
+	fp := requirementByTriage(t, reqs, "defectdojo/false_p")
+
+	// Raw status stays failed; the dismissal is an override, not a rewrite.
+	assert.Equal(t, hdf.Failed, fp.Results[0].Status)
+
+	require.NotNil(t, fp.EffectiveStatus)
+	assert.Equal(t, hdf.NotApplicable, *fp.EffectiveStatus)
+	require.NotNil(t, fp.Disposition)
+	assert.Equal(t, hdf.FalsePositive, *fp.Disposition)
+
+	require.Len(t, fp.StatusOverrides, 1)
+	ov := fp.StatusOverrides[0]
+	assert.Equal(t, hdf.FalsePositive, ov.Type)
+	require.NotNil(t, ov.Status)
+	assert.Equal(t, hdf.NotApplicable, *ov.Status)
+	assert.Equal(t, "Some mitigation", ov.Reason) // the finding's mitigation note
+	assert.Equal(t, "defectdojo-user-1", ov.AppliedBy.Identifier)
+	assert.Equal(t, hdf.Simple, ov.AppliedBy.Type)
+	assert.Equal(t, 2026, ov.AppliedAt.Year()) // mitigated date
+	assert.Equal(t, 2027, ov.ExpiresAt.Year()) // appliedAt + 1yr
+	assert.Equal(t, ov.AppliedAt.AddDate(1, 0, 0), ov.ExpiresAt)
+}
+
+// TestConvertDefectDojo_NoOverrideForUntriaged locks the no-triage branch: the
+// active, untriaged finding (finding 1) carries no override — raw status
+// unchanged, no effectiveStatus/disposition/statusOverrides.
+func TestConvertDefectDojo_NoOverrideForUntriaged(t *testing.T) {
+	result, err := ConvertDefectDojo(loadFixture(t, "findings.json"), converterVersion)
+	require.NoError(t, err)
+	active := requirementByTriage(t, result.Baselines[0].Requirements, "defectdojo/active")
+
+	assert.Equal(t, hdf.Failed, active.Results[0].Status)
+	assert.Nil(t, active.EffectiveStatus, "untriaged finding carries no effectiveStatus")
+	assert.Nil(t, active.Disposition, "untriaged finding carries no disposition")
+	assert.Empty(t, active.StatusOverrides, "untriaged finding carries no override")
+}
+
+// TestBuildFalsePositiveOverride_Branches covers the falsePositive builder's
+// reviewer-identity precedence, reason fallback, and appliedAt fallbacks.
+func TestBuildFalsePositiveOverride_Branches(t *testing.T) {
+	email := "rev@example.com"
+	user := "reviewer"
+
+	// email > username > user id > system identity precedence
+	assert.Equal(t, hdf.Identity{Type: hdf.Email, Identifier: email},
+		buildFalsePositiveOverride(ddFinding{MitigatedByEmail: &email, MitigatedByUsername: &user, MitigatedBy: "1"}).AppliedBy)
+	assert.Equal(t, hdf.Identity{Type: hdf.Username, Identifier: user},
+		buildFalsePositiveOverride(ddFinding{MitigatedByUsername: &user, MitigatedBy: "1"}).AppliedBy)
+	assert.Equal(t, hdf.Identity{Type: hdf.Simple, Identifier: "defectdojo-user-7"},
+		buildFalsePositiveOverride(ddFinding{MitigatedBy: "7"}).AppliedBy)
+	assert.Equal(t, hdf.Identity{Type: hdf.IdentityTypeOther, Identifier: "defectdojo (false positive triage)"},
+		buildFalsePositiveOverride(ddFinding{}).AppliedBy)
+
+	// reason: mitigation note when present, else constant fallback
+	assert.Equal(t, "note here", buildFalsePositiveOverride(ddFinding{Mitigation: "note here"}).Reason)
+	assert.Equal(t, "Marked as false positive in DefectDojo", buildFalsePositiveOverride(ddFinding{}).Reason)
+
+	// appliedAt: mitigated date wins; else finding date; expiresAt is +1yr
+	mit := "2030-05-01T00:00:00Z"
+	ovMit := buildFalsePositiveOverride(ddFinding{Mitigated: &mit, Date: "2020-01-01"})
+	assert.Equal(t, 2030, ovMit.AppliedAt.Year())
+	assert.Equal(t, 2031, ovMit.ExpiresAt.Year())
+
+	ovDate := buildFalsePositiveOverride(ddFinding{Date: "2022-03-04"})
+	assert.Equal(t, "2022-03-04T00:00:00Z", ovDate.AppliedAt.UTC().Format(time.RFC3339))
+
+	// no mitigated date and no finding date → now() fallback (non-zero)
+	ovNow := buildFalsePositiveOverride(ddFinding{})
+	assert.False(t, ovNow.AppliedAt.IsZero())
+}
+
+// TestConvertFinding_WaiverWinsOverFalsePositive locks the documented precedence:
+// a finding that is both risk-accepted and false-positive gets the waiver, not
+// the falsePositive override.
+func TestConvertFinding_WaiverWinsOverFalsePositive(t *testing.T) {
+	req := convertFinding(ddFinding{
+		Title:         "t",
+		Severity:      "High",
+		FalseP:        true,
+		RiskAccepted:  true,
+		AcceptedRisks: []ddAcceptedRisk{{Name: "AcceptName"}},
+	})
+	require.NotNil(t, req.Disposition)
+	assert.Equal(t, hdf.OverrideTypeWaiver, *req.Disposition)
+	require.Len(t, req.StatusOverrides, 1)
+	assert.Equal(t, hdf.OverrideTypeWaiver, req.StatusOverrides[0].Type)
 }
 
 // TestConvertDefectDojo_RequirementCode pins requirement.code to the raw
@@ -283,6 +383,84 @@ func TestParseFindingDate_Branches(t *testing.T) {
 	assert.True(t, latestFindingDate([]ddFinding{{Date: "nope"}}).IsZero())
 	latest := latestFindingDate([]ddFinding{{Date: "2021-01-06"}, {Date: ""}, {Date: "2024-01-04"}})
 	assert.Equal(t, "2024-01-04T00:00:00Z", latest.UTC().Format(time.RFC3339))
+}
+
+// TestConvertDefectDojo_SourceLocation pins the structured requirement.sourceLocation
+// promoted from the finding's file_path/line. The shared value-pin: finding 1 →
+// src/first.cpp:13, finding 2 → src/two.cpp:135. Line serializes as a plain number
+// (float64 without fraction) so Go and TS stay byte-identical.
+func TestConvertDefectDojo_SourceLocation(t *testing.T) {
+	result, err := ConvertDefectDojo(loadFixture(t, "findings.json"), converterVersion)
+	require.NoError(t, err)
+	byID := map[string]hdf.EvaluatedRequirement{}
+	for _, r := range result.Baselines[0].Requirements {
+		byID[r.ID] = r
+	}
+
+	first := byID["DefectDojo-Finding-1"]
+	require.NotNil(t, first.SourceLocation, "file_path/line must promote to sourceLocation")
+	require.NotNil(t, first.SourceLocation.Ref)
+	assert.Equal(t, "src/first.cpp", *first.SourceLocation.Ref)
+	require.NotNil(t, first.SourceLocation.Line)
+	assert.Equal(t, float64(13), *first.SourceLocation.Line)
+
+	second := byID["DefectDojo-Finding-2"]
+	require.NotNil(t, second.SourceLocation)
+	assert.Equal(t, "src/two.cpp", *second.SourceLocation.Ref)
+	require.NotNil(t, second.SourceLocation.Line)
+	assert.Equal(t, float64(135), *second.SourceLocation.Line)
+
+	// Line serializes as a bare integer (byte-parity with the TS twin).
+	out, err := json.Marshal(first.SourceLocation)
+	require.NoError(t, err)
+	assert.JSONEq(t, `{"ref":"src/first.cpp","line":13}`, string(out))
+}
+
+// TestBuildSourceLocation_Branches covers every branch: primary file_path/line,
+// the SAST fallback when file_path is absent, ref-only when line is absent, and
+// the omit branch when the finding carries no locus at all.
+func TestBuildSourceLocation_Branches(t *testing.T) {
+	path := "src/a.go"
+	line := 42
+
+	// primary file_path/line
+	loc := buildSourceLocation(ddFinding{FilePath: &path, Line: &line})
+	require.NotNil(t, loc)
+	assert.Equal(t, "src/a.go", *loc.Ref)
+	require.NotNil(t, loc.Line)
+	assert.Equal(t, float64(42), *loc.Line)
+
+	// file_path present, line absent → ref only, line omitted
+	locNoLine := buildSourceLocation(ddFinding{FilePath: &path})
+	require.NotNil(t, locNoLine)
+	assert.Equal(t, "src/a.go", *locNoLine.Ref)
+	assert.Nil(t, locNoLine.Line, "line omitted when source line is absent")
+
+	// file_path absent → SAST source fallback used instead
+	sastPath := "sast/b.go"
+	sastLine := 7
+	locSast := buildSourceLocation(ddFinding{SastSourceFile: &sastPath, SastSourceLine: &sastLine})
+	require.NotNil(t, locSast)
+	assert.Equal(t, "sast/b.go", *locSast.Ref)
+	require.NotNil(t, locSast.Line)
+	assert.Equal(t, float64(7), *locSast.Line)
+
+	// file_path present wins over SAST even when both are set
+	locBoth := buildSourceLocation(ddFinding{FilePath: &path, Line: &line, SastSourceFile: &sastPath, SastSourceLine: &sastLine})
+	require.NotNil(t, locBoth)
+	assert.Equal(t, "src/a.go", *locBoth.Ref, "file_path takes precedence over sast_source_file_path")
+
+	// no locus at all → omitted
+	assert.Nil(t, buildSourceLocation(ddFinding{Title: "t"}), "no path → sourceLocation omitted")
+	empty := ""
+	assert.Nil(t, buildSourceLocation(ddFinding{FilePath: &empty}), "empty file_path → sourceLocation omitted")
+}
+
+// TestConvertFinding_NoSourceLocation covers the caller branch that leaves
+// sourceLocation unset for a finding with no file locus.
+func TestConvertFinding_NoSourceLocation(t *testing.T) {
+	req := convertFinding(ddFinding{Title: "t", Severity: "High"})
+	assert.Nil(t, req.SourceLocation, "no source path → sourceLocation unset")
 }
 
 func TestConvertDefectDojo_Empty(t *testing.T) {

@@ -92,9 +92,10 @@ func TestConvert_StatusMapping_Resolved_FalsePositive(t *testing.T) {
 	result, err := ConvertMsftDefenderEndpointToHDF(input, testVersion)
 	require.NoError(t, err)
 
-	// Third alert: resolved with classification "falsePositive" → Passed
+	// Third alert: resolved+falsePositive. Raw stays Failed (the detection fired);
+	// the falsePositive triage rides in a structured override → effectiveStatus N/A.
 	req := result.Baselines[0].Requirements[2]
-	assert.Equal(t, hdf.Passed, req.Results[0].Status)
+	assert.Equal(t, hdf.Failed, req.Results[0].Status)
 }
 
 func TestConvert_StatusMapping_Resolved_TruePositive(t *testing.T) {
@@ -102,9 +103,128 @@ func TestConvert_StatusMapping_Resolved_TruePositive(t *testing.T) {
 	result, err := ConvertMsftDefenderEndpointToHDF(input, testVersion)
 	require.NoError(t, err)
 
-	// Fourth alert: resolved with classification "truePositive" → Failed
+	// Fourth alert: resolved with classification "truePositive" → Failed, no override
 	req := result.Baselines[0].Requirements[3]
 	assert.Equal(t, hdf.Failed, req.Results[0].Status)
+}
+
+// ---- Structured status overrides from triage ----
+
+// TestConvert_FalsePositive_Override pins the full structured override built from
+// the falsePositive triage on sample alert[2]: raw failed + effectiveStatus N/A +
+// disposition falsePositive, with full provenance (assignedTo owner + resolved
+// time) and the loose classification/determination tags removed.
+func TestConvert_FalsePositive_Override(t *testing.T) {
+	input := loadFixture(t, "input/sample.json")
+	result, err := ConvertMsftDefenderEndpointToHDF(input, testVersion)
+	require.NoError(t, err)
+
+	req := result.Baselines[0].Requirements[2]
+
+	// Raw failure preserved; effective status + disposition reflect the override.
+	assert.Equal(t, hdf.Failed, req.Results[0].Status)
+	require.NotNil(t, req.EffectiveStatus)
+	assert.Equal(t, hdf.NotApplicable, *req.EffectiveStatus)
+	require.NotNil(t, req.Disposition)
+	assert.Equal(t, hdf.FalsePositive, *req.Disposition)
+
+	require.Len(t, req.StatusOverrides, 1)
+	ov := req.StatusOverrides[0]
+	assert.Equal(t, hdf.FalsePositive, ov.Type)
+	require.NotNil(t, ov.Status)
+	assert.Equal(t, hdf.NotApplicable, *ov.Status)
+	assert.Equal(t, "notMalicious (falsePositive)", ov.Reason)
+	assert.Equal(t, "analyst@contoso.com", ov.AppliedBy.Identifier)
+	assert.Equal(t, hdf.Email, ov.AppliedBy.Type)
+	// appliedAt = resolvedDateTime (canonical UTC); expiresAt = appliedAt + 1yr.
+	assert.Equal(t, "2021-01-28T12:00:00Z", ov.AppliedAt.Format(time.RFC3339Nano))
+	assert.Equal(t, "2022-01-28T12:00:00Z", ov.ExpiresAt.Format(time.RFC3339Nano))
+
+	// The loose triage tags are replaced by the structured override.
+	_, hasClass := req.Tags["classification"]
+	_, hasDet := req.Tags["determination"]
+	assert.False(t, hasClass, "classification tag replaced by override")
+	assert.False(t, hasDet, "determination tag replaced by override")
+}
+
+// TestConvert_TruePositive_NoOverride pins the no-override branch: a truePositive
+// alert keeps its raw failed status, carries no override/effectiveStatus/
+// disposition, and retains its classification/determination as loose tags.
+func TestConvert_TruePositive_NoOverride(t *testing.T) {
+	input := loadFixture(t, "input/sample.json")
+	result, err := ConvertMsftDefenderEndpointToHDF(input, testVersion)
+	require.NoError(t, err)
+
+	req := result.Baselines[0].Requirements[3]
+	assert.Equal(t, hdf.Failed, req.Results[0].Status)
+	assert.Empty(t, req.StatusOverrides, "truePositive gets no override")
+	assert.Nil(t, req.EffectiveStatus)
+	assert.Nil(t, req.Disposition)
+	assert.Equal(t, "truePositive", req.Tags["classification"])
+	assert.Equal(t, "malware", req.Tags["determination"])
+}
+
+// TestConvert_Untriaged_NoOverride pins that an alert with no classification gets
+// no override at all (minimal.json alert has classification: null).
+func TestConvert_Untriaged_NoOverride(t *testing.T) {
+	input := loadFixture(t, "input/minimal.json")
+	result, err := ConvertMsftDefenderEndpointToHDF(input, testVersion)
+	require.NoError(t, err)
+
+	req := result.Baselines[0].Requirements[0]
+	assert.Empty(t, req.StatusOverrides)
+	assert.Nil(t, req.EffectiveStatus)
+	assert.Nil(t, req.Disposition)
+}
+
+// TestConvert_InformationalExpectedActivity_Override covers the waiver branch:
+// classification informationalExpectedActivity → waiver override, effectiveStatus
+// passed. Not present in the fixtures (synthetic inline input, not a fabricated
+// fixture file), so pinned directly.
+func TestConvert_InformationalExpectedActivity_Override(t *testing.T) {
+	doc := `{"value":[{"id":"a","status":"resolved","severity":"low","category":"Execution",` +
+		`"title":"t","description":"d","classification":"informationalExpectedActivity",` +
+		`"determination":"securityTesting","assignedTo":"redteam","resolvedDateTime":"2023-06-07T08:09:10Z"}]}`
+	result, err := ConvertMsftDefenderEndpointToHDF([]byte(doc), testVersion)
+	require.NoError(t, err)
+
+	req := result.Baselines[0].Requirements[0]
+	assert.Equal(t, hdf.Failed, req.Results[0].Status)
+	require.NotNil(t, req.EffectiveStatus)
+	assert.Equal(t, hdf.Passed, *req.EffectiveStatus)
+	require.NotNil(t, req.Disposition)
+	assert.Equal(t, hdf.OverrideTypeWaiver, *req.Disposition)
+
+	require.Len(t, req.StatusOverrides, 1)
+	ov := req.StatusOverrides[0]
+	assert.Equal(t, hdf.OverrideTypeWaiver, ov.Type)
+	assert.Equal(t, "securityTesting (informationalExpectedActivity)", ov.Reason)
+	// assignedTo without an "@" is typed as a username, not an email.
+	assert.Equal(t, "redteam", ov.AppliedBy.Identifier)
+	assert.Equal(t, hdf.Username, ov.AppliedBy.Type)
+	assert.Equal(t, "2023-06-07T08:09:10Z", ov.AppliedAt.Format(time.RFC3339Nano))
+	assert.Equal(t, "2024-06-07T08:09:10Z", ov.ExpiresAt.Format(time.RFC3339Nano))
+}
+
+// TestConvert_FalsePositive_SystemFallbackIdentity pins the honest system-identity
+// fallback when a falsePositive alert carries no assignedTo owner, and the
+// resolvedDateTime→lastUpdateDateTime appliedAt fallback.
+func TestConvert_FalsePositive_SystemFallbackIdentity(t *testing.T) {
+	doc := `{"value":[{"id":"a","status":"resolved","severity":"low","category":"Execution",` +
+		`"title":"t","description":"d","classification":"falsePositive",` +
+		`"lastUpdateDateTime":"2023-01-02T03:04:05Z"}]}`
+	result, err := ConvertMsftDefenderEndpointToHDF([]byte(doc), testVersion)
+	require.NoError(t, err)
+
+	req := result.Baselines[0].Requirements[0]
+	require.Len(t, req.StatusOverrides, 1)
+	ov := req.StatusOverrides[0]
+	assert.Equal(t, hdf.IdentityTypeSystem, ov.AppliedBy.Type)
+	assert.Equal(t, "Microsoft Defender for Endpoint (automated triage)", ov.AppliedBy.Identifier)
+	// No classification-only determination → reason is just the classification.
+	assert.Equal(t, "falsePositive", ov.Reason)
+	// resolvedDateTime absent → appliedAt falls back to lastUpdateDateTime.
+	assert.Equal(t, "2023-01-02T03:04:05Z", ov.AppliedAt.Format(time.RFC3339Nano))
 }
 
 // ---- Severity mapping ----
@@ -184,6 +304,33 @@ func TestConvert_Target_Host(t *testing.T) {
 	assert.Equal(t, "temp123.middleeast.corp.microsoft.com", *target.FQDN)
 	require.NotNil(t, target.OSName)
 	assert.Equal(t, "Windows10", *target.OSName)
+
+	// MDE device id is surfaced as an external identifier.
+	require.NotNil(t, target.ExternalIDS)
+	assert.Equal(t, "111e6dd8c833c8a052ea231ec1b19adaf497b625", target.ExternalIDS["mde"])
+
+	// rbac/health/onboarding are surfaced as labels alongside provider.
+	assert.Equal(t, "A", target.Labels["rbacGroupName"])
+	assert.Equal(t, "active", target.Labels["healthStatus"])
+	assert.Equal(t, "onboarded", target.Labels["onboardingStatus"])
+	assert.Equal(t, "azure", target.Labels["provider"])
+}
+
+// TestConvert_Target_NameFromDeviceIDFallback pins Name=mdeDeviceId when the
+// device evidence carries an id but no dns name.
+func TestConvert_Target_NameFromDeviceIDFallback(t *testing.T) {
+	doc := `{"value":[{"id":"a","status":"new","severity":"low","category":"Execution",` +
+		`"title":"t","description":"d","evidence":[{"@odata.type":"#microsoft.graph.security.deviceEvidence",` +
+		`"mdeDeviceId":"abc123"}]}]}`
+	result, err := ConvertMsftDefenderEndpointToHDF([]byte(doc), testVersion)
+	require.NoError(t, err)
+
+	require.Len(t, result.Components, 1)
+	target := result.Components[0]
+	assert.Equal(t, hdf.Host, target.Type)
+	assert.Equal(t, "abc123", target.Name)
+	assert.Nil(t, target.FQDN, "no dns name → no fqdn")
+	assert.Equal(t, "abc123", target.ExternalIDS["mde"])
 }
 
 func TestConvert_Target_Deduplicated(t *testing.T) {
@@ -193,6 +340,40 @@ func TestConvert_Target_Deduplicated(t *testing.T) {
 
 	// 4 alerts with 4 different devices → 4 targets
 	assert.Len(t, result.Components, 4)
+}
+
+// TestConvert_Target_DedupByDeviceID pins dedup on mdeDeviceId: two alerts on the
+// same device id (even with differing dns names) collapse to one host component.
+func TestConvert_Target_DedupByDeviceID(t *testing.T) {
+	doc := `{"value":[` +
+		`{"id":"a","status":"new","severity":"low","category":"Execution","title":"t","description":"d",` +
+		`"evidence":[{"@odata.type":"#microsoft.graph.security.deviceEvidence","deviceDnsName":"host-a.example.com","mdeDeviceId":"same-id"}]},` +
+		`{"id":"b","status":"new","severity":"low","category":"Execution","title":"t","description":"d",` +
+		`"evidence":[{"@odata.type":"#microsoft.graph.security.deviceEvidence","deviceDnsName":"host-a-renamed.example.com","mdeDeviceId":"same-id"}]}` +
+		`]}`
+	result, err := ConvertMsftDefenderEndpointToHDF([]byte(doc), testVersion)
+	require.NoError(t, err)
+
+	require.Len(t, result.Components, 1, "same mdeDeviceId → one host component")
+	assert.Equal(t, "same-id", result.Components[0].ExternalIDS["mde"])
+}
+
+// TestConvert_Target_NoDeviceEvidence pins the absent branch: an alert with no
+// device evidence emits no host component (falls back to the tenant cloud account,
+// which carries no mde external id).
+func TestConvert_Target_NoDeviceEvidence(t *testing.T) {
+	doc := `{"value":[{"id":"a","status":"new","severity":"low","category":"Execution",` +
+		`"title":"t","description":"d","tenantId":"tenant-xyz",` +
+		`"evidence":[{"@odata.type":"#microsoft.graph.security.processEvidence","processCommandLine":"x"}]}]}`
+	result, err := ConvertMsftDefenderEndpointToHDF([]byte(doc), testVersion)
+	require.NoError(t, err)
+
+	require.Len(t, result.Components, 1)
+	target := result.Components[0]
+	assert.Equal(t, hdf.CloudAccount, target.Type)
+	assert.NotEqual(t, hdf.Host, target.Type, "no device evidence → no host component")
+	_, hasMde := target.ExternalIDS["mde"]
+	assert.False(t, hasMde, "cloud-account fallback carries no mde external id")
 }
 
 // ---- MITRE ATT&CK techniques in tags ----
@@ -454,31 +635,6 @@ func TestSeverityToImpact(t *testing.T) {
 	for _, tc := range tests {
 		t.Run(tc.severity, func(t *testing.T) {
 			assert.Equal(t, tc.expected, severityToImpact(tc.severity))
-		})
-	}
-}
-
-// ---- Helper: statusToResult ----
-
-func TestStatusToResult(t *testing.T) {
-	falsePos := "falsePositive"
-	truePos := "truePositive"
-
-	tests := []struct {
-		name           string
-		status         string
-		classification *string
-		expected       hdf.ResultStatus
-	}{
-		{"new", "new", nil, hdf.Failed},
-		{"inProgress", "inProgress", nil, hdf.Failed},
-		{"resolved_falsePositive", "resolved", &falsePos, hdf.Passed},
-		{"resolved_truePositive", "resolved", &truePos, hdf.Failed},
-		{"resolved_nil", "resolved", nil, hdf.Failed},
-	}
-	for _, tc := range tests {
-		t.Run(tc.name, func(t *testing.T) {
-			assert.Equal(t, tc.expected, statusToResult(tc.status, tc.classification))
 		})
 	}
 }
