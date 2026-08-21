@@ -1,0 +1,83 @@
+{
+  "baselines": [
+    {
+      "requirements": [
+        {
+          "descriptions": [
+            {
+              "data": "Found 'subprocess' function 'run' with 'shell=True'. This is dangerous because this call will spawn the command using a shell process. Doing so propagates current shell settings and variables, which makes it much easier for a malicious actor to execute commands. Use 'shell=False' instead.",
+              "label": "default"
+            }
+          ],
+          "results": [
+            {
+              "codeDesc": "Path: app/handlers.py, line 7",
+              "message": "Suggested fix -- replace the matched code with:\nFalse",
+              "startTime": "2026-08-21T21:34:15.183972Z",
+              "status": "failed"
+            }
+          ],
+          "id": "python.lang.security.audit.subprocess-shell-true.subprocess-shell-true",
+          "impact": 0.7,
+          "tags": {
+            "category": "security",
+            "cci": [
+              "CCI-001310"
+            ],
+            "checkId": "python.lang.security.audit.subprocess-shell-true.subprocess-shell-true",
+            "confidence": "MEDIUM",
+            "cwe": [
+              "CWE-78: Improper Neutralization of Special Elements used in an OS Command ('OS Command Injection')"
+            ],
+            "likelihood": "HIGH",
+            "nist": [
+              "SI-10"
+            ],
+            "owasp": [
+              "A01:2017 - Injection",
+              "A03:2021 - Injection",
+              "A05:2025 - Injection"
+            ],
+            "references": [
+              "https://stackoverflow.com/questions/3172470/actual-meaning-of-shell-true-in-subprocess",
+              "https://docs.python.org/3/library/subprocess.html",
+              "https://semgrep.dev/r/python.lang.security.audit.subprocess-shell-true.subprocess-shell-true",
+              "https://sg.run/J92w",
+              "https://bandit.readthedocs.io/en/latest/plugins/b602_subprocess_popen_with_shell_equals_true.html"
+            ],
+            "semgrepImpact": "LOW",
+            "severity": "ERROR",
+            "subcategory": [
+              "secure default"
+            ],
+            "technology": [
+              "python"
+            ],
+            "vulnerabilityClass": [
+              "Command Injection"
+            ]
+          },
+          "controlType": "technical",
+          "title": "Subprocess Shell True",
+          "verificationMethod": "automated"
+        }
+      ],
+      "resultsChecksum": {
+        "algorithm": "sha256",
+        "value": "61d640e987f8e46e8a8c4873b307bb80a834a2d022f570f9576a7e010a7ec41b"
+      },
+      "name": "Semgrep Scan",
+      "title": "Semgrep static analysis scan"
+    }
+  ],
+  "generator": {
+    "name": "semgrep-to-hdf",
+    "version": "1.0.0"
+  },
+  "timestamp": "2026-08-21T21:34:15.183972Z",
+  "tool": {
+    "format": "json",
+    "name": "Semgrep",
+    "version": "1.174.0"
+  }
+}

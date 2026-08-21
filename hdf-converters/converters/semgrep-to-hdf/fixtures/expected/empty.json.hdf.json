@@ -1,0 +1,43 @@
+{
+  "baselines": [
+    {
+      "requirements": [
+        {
+          "descriptions": [
+            {
+              "data": "Semgrep scanned 1 file(s) and reported no findings.",
+              "label": "default"
+            }
+          ],
+          "results": [
+            {
+              "codeDesc": "Semgrep scanned 1 file(s) and reported no findings.",
+              "startTime": "2026-08-21T21:34:15.182431Z",
+              "status": "passed"
+            }
+          ],
+          "id": "semgrep-no-findings",
+          "impact": 0,
+          "tags": {},
+          "title": "No findings reported"
+        }
+      ],
+      "resultsChecksum": {
+        "algorithm": "sha256",
+        "value": "bdd88db20f9cda9a4e5db1087be2541166741b0033ef1fefb2424c1b28427b5a"
+      },
+      "name": "Semgrep Scan",
+      "title": "Semgrep static analysis scan"
+    }
+  ],
+  "generator": {
+    "name": "semgrep-to-hdf",
+    "version": "1.0.0"
+  },
+  "timestamp": "2026-08-21T21:34:15.182431Z",
+  "tool": {
+    "format": "json",
+    "name": "Semgrep",
+    "version": "1.174.0"
+  }
+}
