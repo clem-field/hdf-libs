@@ -1,0 +1,95 @@
+{
+  "baselines": [
+    {
+      "requirements": [
+        {
+          "descriptions": [
+            {
+              "data": "AWS DB Instance should have its storage encrypted by setting the parameter to 'true'. The storage_encrypted default value is 'false'.",
+              "label": "default"
+            }
+          ],
+          "results": [
+            {
+              "codeDesc": "File: ../../path/main.tf\nLine: 25\nResource type: aws_db_instance\nResource: records\nKey: aws_db_instance[records]",
+              "message": "Expected: 'storage_encrypted' should be set to true\nActual: 'storage_encrypted' is undefined or null\nIssue type: MissingAttribute",
+              "startTime": "2026-08-23T12:38:27.789783Z",
+              "status": "failed"
+            }
+          ],
+          "id": "08bd0760-8752-44e1-9779-7bb369b2b4e4",
+          "impact": 0.7,
+          "tags": {
+            "category": "Encryption",
+            "cci": [
+              "CCI-002418"
+            ],
+            "cloudProvider": "AWS",
+            "cwe": [
+              "CWE-311"
+            ],
+            "descriptionId": "88ca11bc",
+            "issueType": [
+              "MissingAttribute"
+            ],
+            "nist": [
+              "SC-8"
+            ],
+            "nistMapping": "cwe-derived",
+            "platform": "Terraform",
+            "resourceType": [
+              "aws_db_instance"
+            ],
+            "riskScore": "7.1",
+            "severity": "HIGH"
+          },
+          "controlType": "technical",
+          "title": "DB Instance Storage Not Encrypted",
+          "verificationMethod": "automated"
+        },
+        {
+          "descriptions": [
+            {
+              "data": "KICS executed 1100 queries against 1 file(s) (1 parsed); 1 produced findings. KICS reports violations only and does not enumerate the queries that ran without finding anything, so no passing requirements can be derived from its output and the compliance ratio should not be read as a pass rate.",
+              "label": "default"
+            }
+          ],
+          "results": [
+            {
+              "codeDesc": "KICS executed 1100 queries against 1 file(s) (1 parsed); 1 produced findings. KICS reports violations only and does not enumerate the queries that ran without finding anything, so no passing requirements can be derived from its output and the compliance ratio should not be read as a pass rate.",
+              "startTime": "2026-08-23T12:38:27.789783Z",
+              "status": "passed"
+            }
+          ],
+          "id": "kics-scan-coverage",
+          "impact": 0,
+          "tags": {
+            "filesFailedToScan": 0,
+            "filesParsed": 1,
+            "filesScanned": 1,
+            "queriesExecuted": 1100,
+            "queriesFailedToExecute": 0,
+            "queriesWithFindings": 1
+          },
+          "title": "KICS scan coverage"
+        }
+      ],
+      "resultsChecksum": {
+        "algorithm": "sha256",
+        "value": "5c951a95dbe5fe051a2c11a2719b602caabccc9a58918637db4c3bbf635c95f9"
+      },
+      "name": "KICS Scan",
+      "title": "KICS infrastructure-as-code scan"
+    }
+  ],
+  "generator": {
+    "name": "kics-to-hdf",
+    "version": "1.0.0"
+  },
+  "timestamp": "2026-08-23T12:38:27.789783Z",
+  "tool": {
+    "format": "json",
+    "name": "KICS",
+    "version": "v2.1.20"
+  }
+}
