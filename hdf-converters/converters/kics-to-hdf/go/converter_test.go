@@ -1,8 +1,10 @@
 package kics
 
 import (
+	"encoding/json"
 	"os"
 	"path/filepath"
+	"sort"
 	"testing"
 	"time"
 
@@ -64,9 +66,45 @@ func TestRejectsInvalidJSON(t *testing.T) {
 }
 
 func TestRejectsNonKicsDocument(t *testing.T) {
-	for _, in := range []string{`{"foo":1}`, `{"queries":[]}`, `{"kics_version":"v1"}`} {
+	for _, in := range []string{
+		`{"foo":1}`,
+		`{"queries":[]}`,
+		`{"kics_version":"v1"}`,
+		// key present but wrong type: a truncated or jq-filtered report must
+		// not silently convert to a clean no-findings document
+		`{"kics_version":"v2.1.20","queries":null}`,
+		`{"kics_version":"v2.1.20","queries":{}}`,
+		`{"kics_version":5,"queries":[]}`,
+		`{"kics_version":null,"queries":[]}`,
+	} {
 		_, err := ConvertKicsToHDF([]byte(in), testVersion)
-		require.ErrorContains(t, err, "does not look like a KICS report")
+		require.ErrorContains(t, err, "does not look like a KICS report", "input: %s", in)
+	}
+}
+
+// Convert and auto-detect must agree: an input the fingerprint scores 0 must
+// not convert, and every accepted fixture must fingerprint at full confidence.
+func TestConvertAndDetectAgree(t *testing.T) {
+	for _, in := range []string{
+		`{"kics_version":"v2.1.20","queries":null}`,
+		`{"kics_version":"v2.1.20","queries":{}}`,
+		`{"kics_version":5,"queries":[]}`,
+		`{"kics_version":null,"queries":[]}`,
+	} {
+		var obj map[string]any
+		require.NoError(t, json.Unmarshal([]byte(in), &obj))
+		assert.Equal(t, 0.0, fingerprintObject(obj), in)
+		_, err := ConvertKicsToHDF([]byte(in), testVersion)
+		require.Error(t, err, in)
+	}
+
+	for _, name := range []string{"findings.json", "minimal.json", "zero-findings.json"} {
+		raw := fixture(t, name)
+		var fobj map[string]any
+		require.NoError(t, json.Unmarshal(raw, &fobj))
+		assert.Equal(t, 1.0, fingerprintObject(fobj), name)
+		_, err := ConvertKicsToHDF(raw, testVersion)
+		require.NoError(t, err, name)
 	}
 }
 
@@ -89,20 +127,40 @@ func TestOneRequirementPerQuery(t *testing.T) {
 	}
 }
 
-func TestSeverityMappingKeepsFiveLevelsAndNeverZero(t *testing.T) {
+func TestSeverityMappingKeepsFiveLevels(t *testing.T) {
 	assert.Equal(t, 0.9, impactFor("CRITICAL"))
 	assert.Equal(t, 0.7, impactFor("HIGH"))
 	assert.Equal(t, 0.5, impactFor("MEDIUM"))
 	assert.Equal(t, 0.3, impactFor("LOW"))
-	assert.Equal(t, 0.1, impactFor("INFO"))
-	assert.Equal(t, 0.1, impactFor("TRACE"))
-	// unknown and absent both fall to moderate, never to zero
+	// canonical info tier: 0.0, like every other converter in the repo. The
+	// effective-status layer treats impact-0 requirements as notApplicable, so
+	// info-tier findings stay visible without entering the compliance ratio.
+	assert.Equal(t, 0.0, impactFor("INFO"))
+	assert.Equal(t, 0.0, impactFor("TRACE"))
+	// unknown and absent both fall to moderate
 	assert.Equal(t, defaultImpact, impactFor("NOVEL"))
 	assert.Equal(t, defaultImpact, impactFor(""))
-	out := convert(t, "findings.json")
-	for _, r := range findingReqs(out) {
-		assert.Greater(t, r.Impact, 0.0, "impact 0 would report Not Applicable")
-	}
+}
+
+func TestAbsentSeverityGetsUnratedMarker(t *testing.T) {
+	start := time.Now().UTC()
+	unrated := buildRequirement(Query{QueryID: "q", Files: []File{{FileName: "a.tf"}}}, start)
+	assert.Equal(t, shared.UnratedSeverityValue, unrated.Tags[shared.UnratedSeverityTag])
+
+	// an unrecognized token is a rating we don't know, not an absent rating
+	novel := buildRequirement(Query{QueryID: "q", Severity: "NOVEL", Files: []File{{FileName: "a.tf"}}}, start)
+	assert.Nil(t, novel.Tags[shared.UnratedSeverityTag])
+
+	rated := buildRequirement(Query{QueryID: "q", Severity: "HIGH", Files: []File{{FileName: "a.tf"}}}, start)
+	assert.Nil(t, rated.Tags[shared.UnratedSeverityTag])
+}
+
+// Parity twin of the TS prototype-named-token test: both languages must treat
+// "constructor" as an ordinary unknown token (default impact, fallback tier).
+func TestPrototypeNamedTokensAreOrdinaryUnknowns(t *testing.T) {
+	assert.Equal(t, defaultImpact, impactFor("constructor"))
+	_, _, source := ResolveControls(Query{QueryID: "constructor"}, KicsMappingData)
+	assert.Equal(t, nistMappingFallback, source)
 }
 
 func TestRecordsWhyTheNistTagIsWhatItIs(t *testing.T) {
@@ -202,6 +260,40 @@ func TestFallsBackToQueryNameWhenIdMissing(t *testing.T) {
 	assert.Equal(t, "Some Check", *r.Title)
 }
 
+func TestIdentityFallbacksWhenBothMissing(t *testing.T) {
+	r := buildRequirement(Query{Files: []File{{FileName: "a.tf"}}}, time.Now().UTC())
+	assert.Equal(t, "unknown", r.ID)
+	assert.Equal(t, "Unnamed KICS query", *r.Title)
+}
+
+func TestRiskScoreTagFormatting(t *testing.T) {
+	// strings pass through untouched
+	tags, _ := tagsFor(Query{RiskScore: "7.1"})
+	assert.Equal(t, "7.1", tags["riskScore"])
+	// numbers format without exponent notation, matching TS String() across
+	// KICS's realistic 0-10 risk_score range (and well beyond)
+	tags, _ = tagsFor(Query{RiskScore: float64(1000000)})
+	assert.Equal(t, "1000000", tags["riskScore"])
+	tags, _ = tagsFor(Query{RiskScore: float64(8.6)})
+	assert.Equal(t, "8.6", tags["riskScore"])
+	// JSON null (key present, score not computed) omits the tag
+	tags, _ = tagsFor(Query{RiskScore: nil})
+	assert.Nil(t, tags["riskScore"])
+}
+
+func TestLocationCarriesSimilarityID(t *testing.T) {
+	got := locationFor(File{FileName: "a.tf", SimilarityID: "4efca9c9"})
+	assert.Contains(t, got, "Similarity ID: 4efca9c9")
+	assert.NotContains(t, locationFor(File{FileName: "a.tf"}), "Similarity ID")
+}
+
+func TestTagsCarryQueryURL(t *testing.T) {
+	tags, _ := tagsFor(Query{QueryURL: "https://example.com/docs"})
+	assert.Equal(t, "https://example.com/docs", tags["queryUrl"])
+	tags, _ = tagsFor(Query{})
+	assert.Nil(t, tags["queryUrl"])
+}
+
 func TestDistinctDropsBlanksAndDuplicates(t *testing.T) {
 	assert.Equal(t, []string{"a", "b"}, distinct([]string{"a", "", "a", "b", ""}))
 	assert.Nil(t, distinct([]string{"", ""}))
@@ -235,14 +327,16 @@ func TestResolveFallsBackToCwe(t *testing.T) {
 	nist, _, source := ResolveControls(Query{QueryID: "absent", CWE: "311"}, stubTable)
 	assert.Equal(t, nistMappingCWE, source)
 	assert.NotEmpty(t, nist)
-	assert.NotEqual(t, defaultNistTags, nist)
+	assert.NotEqual(t, shared.DefaultStaticAnalysisNIST, nist)
+	// shared.MapCWEToNIST sorts; TS mapCWEToNIST does too. Order is parity.
+	assert.True(t, sort.StringsAreSorted(nist), "CWE-derived controls must be sorted: %v", nist)
 }
 
 func TestResolveFallsBackToDefaultsWhenCweUnmapped(t *testing.T) {
 	// CWE-778 is one of the 72 KICS uses that the CWE table lacks
 	nist, ccis, source := ResolveControls(Query{QueryID: "absent", CWE: "778"}, stubTable)
 	assert.Equal(t, nistMappingFallback, source)
-	assert.Equal(t, defaultNistTags, nist)
+	assert.Equal(t, shared.DefaultStaticAnalysisNIST, nist)
 	assert.NotEmpty(t, ccis)
 }
 
@@ -263,8 +357,12 @@ func TestCoverageRequirementRecordsTheDenominator(t *testing.T) {
 	cov := requirementByID(out, "kics-scan-coverage")
 	require.NotNil(t, cov)
 	assert.Greater(t, cov.Tags["queriesExecuted"], cov.Tags["queriesWithFindings"])
-	assert.Equal(t, 0.0, cov.Impact, "impact 0 keeps it out of the compliance score")
-	assert.Equal(t, hdf.Passed, cov.Results[0].Status)
+	assert.Equal(t, 0.0, cov.Impact)
+	// notApplicable matches what the effective-status layer derives for an
+	// impact-0 requirement, and it is the one status the compliance rollup
+	// excludes. Passed would export to CKL as NotAFinding and count as a free
+	// pass in raw status rollups.
+	assert.Equal(t, hdf.NotApplicable, cov.Results[0].Status)
 	assert.Contains(t, cov.Results[0].CodeDesc, "violations only")
 	assert.Contains(t, cov.Results[0].CodeDesc, "should not be read as a pass rate")
 }

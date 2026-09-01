@@ -28,7 +28,18 @@ runConverterContractTests({
 
 describe('kics to HDF converter', () => {
   it('rejects input that is not a KICS report', async () => {
-    await expect(convertKicsToHdf('{"foo":1}')).rejects.toThrow('does not look like a KICS report');
+    for (const input of [
+      '{"foo":1}',
+      '{"queries":[]}',
+      '{"kics_version":"v1"}',
+      // key present but wrong type: must match Go's typed probe exactly
+      '{"kics_version":"v2.1.20","queries":null}',
+      '{"kics_version":"v2.1.20","queries":{}}',
+      '{"kics_version":5,"queries":[]}',
+      '{"kics_version":null,"queries":[]}',
+    ]) {
+      await expect(convertKicsToHdf(input)).rejects.toThrow('does not look like a KICS report');
+    }
   });
 
   describe('findings fixture', () => {
@@ -53,12 +64,16 @@ describe('kics to HDF converter', () => {
       const impacts = new Set(findings(hdf).map((r) => r.impact));
       // SARIF collapses CRITICAL and HIGH to `error`; the native scale must not
       expect(impacts.size).toBeGreaterThan(1);
-      for (const i of impacts) expect(i).toBeGreaterThan(0);
     });
 
-    it('never assigns impact 0, which would report Not Applicable', async () => {
+    it('maps INFO findings to the canonical 0.0 info-tier impact', async () => {
+      // the effective-status layer treats impact-0 requirements as
+      // notApplicable, so info-tier findings stay visible without entering
+      // the compliance ratio, like every other converter's info tier
       const hdf = await convert('findings.json');
-      for (const r of findings(hdf)) expect(r.impact).toBeGreaterThan(0);
+      const infoReqs = findings(hdf).filter((r) => r.tags?.severity === 'INFO');
+      expect(infoReqs.length).toBeGreaterThan(0);
+      for (const r of infoReqs) expect(r.impact).toBe(0);
     });
 
     it('carries the remediation pair SARIF drops', async () => {
@@ -201,6 +216,56 @@ describe('sparse and malformed queries', () => {
   it('treats an unrecognized severity as moderate rather than zero', async () => {
     const r = await one([{ query_id: 'q', severity: 'NOVEL', files: [{ file_name: 'a.tf' }] }]);
     expect(r.impact).toBe(0.5);
+    // an unrecognized token is a rating we don't know, not an absent rating
+    expect(r.tags?.severity_rating).toBeUndefined();
+  });
+
+  it('marks an absent severity with the shared unrated marker', async () => {
+    const r = await one([{ query_id: 'q', files: [{ file_name: 'a.tf' }] }]);
+    expect(r.impact).toBe(0.5);
+    expect(r.tags?.severity_rating).toBe('unrated');
+    const rated = await one([{ query_id: 'q', severity: 'HIGH', files: [{ file_name: 'a.tf' }] }]);
+    expect(rated.tags?.severity_rating).toBeUndefined();
+  });
+
+  it('survives prototype-named query_id and severity, matching Go', async () => {
+    // Object.prototype member names must behave like any other unknown token:
+    // "constructor" as query_id falls through to the CWE/static tiers instead
+    // of crashing, and as severity takes the moderate default as a number.
+    const r = await one([{ query_id: 'constructor', severity: 'constructor', files: [{ file_name: 'a.tf' }] }]);
+    expect(r.id).toBe('constructor');
+    expect(r.tags?.nistMapping).toBe('static-fallback');
+    expect(r.impact).toBe(0.5);
+  });
+
+  it('falls through empty-string identity fields exactly like Go', async () => {
+    const named = await one([{ query_id: '', query_name: 'Some Check', files: [{ file_name: 'a.tf' }] }]);
+    expect(named.id).toBe('Some Check');
+    const bare = await one([{ query_id: '', query_name: '', files: [{ file_name: '' }] }]);
+    expect(bare.id).toBe('unknown');
+    expect(bare.title).toBe('Unnamed KICS query');
+    expect(bare.results[0]!.codeDesc).toBe('File: unknown');
+  });
+
+  it('omits the riskScore tag when risk_score is JSON null', async () => {
+    const r = await one([{ query_id: 'q', risk_score: null, files: [{ file_name: 'a.tf' }] }]);
+    expect(r.tags?.riskScore).toBeUndefined();
+    const big = await one([{ query_id: 'q', risk_score: 1000000, files: [{ file_name: 'a.tf' }] }]);
+    expect(big.tags?.riskScore).toBe('1000000');
+  });
+
+  it('carries the similarity id KICS computes per occurrence', async () => {
+    const r = await one([{ query_id: 'q', files: [{ file_name: 'a.tf', similarity_id: '4efca9c9' }] }]);
+    expect(r.results[0]!.codeDesc).toContain('Similarity ID: 4efca9c9');
+    const bare = await one([{ query_id: 'q', files: [{ file_name: 'a.tf' }] }]);
+    expect(bare.results[0]!.codeDesc).not.toContain('Similarity ID');
+  });
+
+  it('carries the query documentation url as a tag', async () => {
+    const r = await one([{ query_id: 'q', query_url: 'https://example.com/docs', files: [{ file_name: 'a.tf' }] }]);
+    expect(r.tags?.queryUrl).toBe('https://example.com/docs');
+    const bare = await one([{ query_id: 'q', files: [{ file_name: 'a.tf' }] }]);
+    expect(bare.tags?.queryUrl).toBeUndefined();
   });
 });
 
@@ -252,9 +317,12 @@ describe('scan coverage requirement', () => {
   it('stays out of the compliance score', async () => {
     const hdf = JSON.parse(await convertKicsToHdf(load('findings.json'))) as HDFResults;
     const cov = hdf.baselines[0]!.requirements.find((r) => r.id === 'kics-scan-coverage')!;
-    // impact 0 reports Not Applicable, so a scan-context record cannot skew the ratio
     expect(cov.impact).toBe(0);
-    expect(cov.results[0]!.status).toBe(ResultStatus.Passed);
+    // notApplicable matches what the effective-status layer derives for an
+    // impact-0 requirement, and it is the one status the compliance rollup
+    // excludes. Passed would export to CKL as NotAFinding and count as a free
+    // pass in raw status rollups.
+    expect(cov.results[0]!.status).toBe(ResultStatus.NotApplicable);
   });
 
   it('says plainly that no passing requirements can be derived', async () => {

@@ -12,7 +12,7 @@
           "results": [
             {
               "codeDesc": "KICS scanned 1 file(s) and reported no findings.",
-              "startTime": "2026-08-23T12:38:27.79022Z",
+              "startTime": "2026-08-26T18:36:21.742575Z",
               "status": "passed"
             }
           ],
@@ -31,8 +31,8 @@
           "results": [
             {
               "codeDesc": "KICS executed 1100 queries against 1 file(s) (1 parsed); 0 produced findings. KICS reports violations only and does not enumerate the queries that ran without finding anything, so no passing requirements can be derived from its output and the compliance ratio should not be read as a pass rate.",
-              "startTime": "2026-08-23T12:38:27.79022Z",
-              "status": "passed"
+              "startTime": "2026-08-26T18:36:21.742575Z",
+              "status": "notApplicable"
             }
           ],
           "id": "kics-scan-coverage",
@@ -60,7 +60,7 @@
     "name": "kics-to-hdf",
     "version": "1.0.0"
   },
-  "timestamp": "2026-08-23T12:38:27.79022Z",
+  "timestamp": "2026-08-26T18:36:21.742575Z",
   "tool": {
     "format": "json",
     "name": "KICS",

@@ -1,16 +1,16 @@
 package kics
 
-// Report is the top-level `kics scan --report-formats json` output.
+// Report is the top-level `kics scan --report-formats json` output. Fields the
+// converter does not emit (severity_counters, total_counter — the fingerprint
+// probes them from raw JSON) are deliberately not parsed.
 type Report struct {
-	Queries            []Query        `json:"queries"`
-	KicsVersion        string         `json:"kics_version"`
-	SeverityCounters   map[string]int `json:"severity_counters"`
-	TotalCounter       int            `json:"total_counter"`
-	FilesScanned       int            `json:"files_scanned"`
-	FilesParsed        int            `json:"files_parsed"`
-	FilesFailedToScan  int            `json:"files_failed_to_scan"`
-	QueriesTotal       int            `json:"queries_total"`
-	QueriesFailedToRun int            `json:"queries_failed_to_execute"`
+	Queries            []Query `json:"queries"`
+	KicsVersion        string  `json:"kics_version"`
+	FilesScanned       int     `json:"files_scanned"`
+	FilesParsed        int     `json:"files_parsed"`
+	FilesFailedToScan  int     `json:"files_failed_to_scan"`
+	QueriesTotal       int     `json:"queries_total"`
+	QueriesFailedToRun int     `json:"queries_failed_to_execute"`
 }
 
 // Query is one KICS query and every place it fired. KICS already groups its
@@ -31,7 +31,8 @@ type Query struct {
 	Files         []File `json:"files"`
 }
 
-// File is one occurrence, against a specific file and resource.
+// File is one occurrence, against a specific file and resource. search_line is
+// deliberately not parsed: it duplicates line for every emitted field.
 type File struct {
 	FileName      string `json:"file_name"`
 	SimilarityID  string `json:"similarity_id"`
@@ -40,7 +41,6 @@ type File struct {
 	ResourceName  string `json:"resource_name"`
 	IssueType     string `json:"issue_type"`
 	SearchKey     string `json:"search_key"`
-	SearchLine    int    `json:"search_line"`
 	SearchValue   string `json:"search_value"`
 	ExpectedValue string `json:"expected_value"`
 	ActualValue   string `json:"actual_value"`

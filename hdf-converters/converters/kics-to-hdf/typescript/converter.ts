@@ -1,4 +1,4 @@
-import { parseJSON } from '@mitre/hdf-utilities';
+import { parseJSON, severityToImpactWithAliases } from '@mitre/hdf-utilities';
 import { DEFAULT_STATIC_ANALYSIS_NIST_TAGS } from '@mitre/hdf-mappings';
 import {
   buildHdfResults,
@@ -7,6 +7,7 @@ import {
   deriveControlTypeFromTags,
   inputChecksum,
   mapCWEToNIST,
+  markUnratedSeverity,
   validateInputSize,
 } from '../../../shared/typescript/converterutil.js';
 import { nistToCci } from '@mitre/hdf-mappings';
@@ -24,7 +25,10 @@ import {
   createRequirement,
 } from '@mitre/hdf-schema';
 
-/** One occurrence of a query, against a specific file and resource. */
+/**
+ * One occurrence of a query, against a specific file and resource. search_line
+ * is deliberately not parsed: it duplicates line for every emitted field.
+ */
 interface KicsFile {
   file_name?: string;
   similarity_id?: string;
@@ -33,7 +37,6 @@ interface KicsFile {
   resource_name?: string;
   issue_type?: string;
   search_key?: string;
-  search_line?: number;
   search_value?: string;
   expected_value?: string;
   actual_value?: string;
@@ -56,11 +59,13 @@ interface KicsQuery {
   files?: KicsFile[];
 }
 
+/**
+ * Fields the converter does not emit (severity_counters, total_counter — the
+ * fingerprint probes them from raw JSON) are deliberately not parsed.
+ */
 interface KicsReport {
   queries?: KicsQuery[];
   kics_version?: string;
-  severity_counters?: Record<string, number>;
-  total_counter?: number;
   files_scanned?: number;
   files_parsed?: number;
   files_failed_to_scan?: number;
@@ -71,19 +76,14 @@ interface KicsReport {
 /**
  * KICS publishes five severities. SARIF collapses CRITICAL and HIGH into
  * `error`; converting the native format keeps them apart, which is a large part
- * of why this converter exists.
- *
- * No level maps to 0: `impact 0` reports Not Applicable in HDF and would drop
- * the finding from the compliance score entirely.
+ * of why this converter exists. The shared standard map covers four of them,
+ * with INFO at the canonical 0.0 tier like every other converter: the
+ * effective-status layer maps impact-0 requirements to notApplicable, so
+ * info-tier findings stay visible in the output without entering the
+ * compliance ratio. TRACE is KICS-specific and joins the info tier as an
+ * alias — the Go peer of this table is kicsSeverityAliases.
  */
-const IMPACT_BY_SEVERITY: Record<string, number> = {
-  critical: 0.9,
-  high: 0.7,
-  medium: 0.5,
-  low: 0.3,
-  info: 0.1,
-  trace: 0.1,
-};
+const KICS_SEVERITY_ALIASES: Record<string, number> = { trace: 0.0 };
 
 const DEFAULT_IMPACT = 0.5;
 
@@ -106,8 +106,7 @@ const NIST_MAPPING_CWE = 'cwe-derived';
 const NIST_MAPPING_FALLBACK = 'static-fallback';
 
 function impactFor(severity?: string): number {
-  if (typeof severity !== 'string' || severity.length === 0) return DEFAULT_IMPACT;
-  return IMPACT_BY_SEVERITY[severity.toLowerCase()] ?? DEFAULT_IMPACT;
+  return severityToImpactWithAliases(severity, KICS_SEVERITY_ALIASES, DEFAULT_IMPACT);
 }
 
 /** KICS emits the bare number, e.g. "778". Normalize before the lookup. */
@@ -119,13 +118,16 @@ function cweIdentifiers(query: KicsQuery): string[] {
 }
 
 function locationFor(file: KicsFile): string {
-  const parts = [`File: ${file.file_name ?? 'unknown'}`];
+  // || not ??: an empty-string file_name takes the placeholder, matching Go.
+  const parts = [`File: ${file.file_name || 'unknown'}`];
   if (typeof file.line === 'number' && file.line > 0) parts.push(`Line: ${file.line}`);
   if (file.resource_type) parts.push(`Resource type: ${file.resource_type}`);
   if (file.resource_name && file.resource_name !== 'unknown') {
     parts.push(`Resource: ${file.resource_name}`);
   }
   if (file.search_key) parts.push(`Key: ${file.search_key}`);
+  // KICS's own stable per-occurrence fingerprint; the identity SARIF drops.
+  if (file.similarity_id) parts.push(`Similarity ID: ${file.similarity_id}`);
   return parts.join('\n');
 }
 
@@ -152,7 +154,14 @@ export function resolveControls(
   query: KicsQuery,
   table: Record<string, KicsMappingEntry> = kicsMappingData,
 ): { nist: string[]; cci: string[]; source: string } {
-  const entry = typeof query.query_id === 'string' ? table[query.query_id] : undefined;
+  // Own-property guard: a prototype-named query_id ("constructor") must fall
+  // through to the CWE tier like any unmapped query, not crash on an
+  // inherited Object member.
+  const entry =
+    typeof query.query_id === 'string' &&
+    Object.prototype.hasOwnProperty.call(table, query.query_id)
+      ? table[query.query_id]
+      : undefined;
   if (entry !== undefined && entry.nist.length > 0) {
     return { nist: entry.nist, cci: entry.cci, source: NIST_MAPPING_TABLE };
   }
@@ -180,7 +189,10 @@ function tagsFor(query: KicsQuery): Record<string, unknown> {
   if (query.platform) extras.platform = query.platform;
   if (query.cloud_provider) extras.cloudProvider = query.cloud_provider;
   if (query.category) extras.category = query.category;
-  if (query.risk_score !== undefined) extras.riskScore = String(query.risk_score);
+  if (query.query_url) extras.queryUrl = query.query_url;
+  // != null: a JSON-null risk_score (key present, score not computed) must be
+  // omitted, not rendered as the literal tag "null".
+  if (query.risk_score != null) extras.riskScore = String(query.risk_score);
   if (query.description_id) extras.descriptionId = query.description_id;
   if (query.experimental) extras.experimental = true;
 
@@ -188,6 +200,7 @@ function tagsFor(query: KicsQuery): Record<string, unknown> {
   if (issueTypes.length > 0) extras.issueType = issueTypes;
   const resourceTypes = [...new Set((query.files ?? []).map((f) => f.resource_type).filter(Boolean))];
   if (resourceTypes.length > 0) extras.resourceType = resourceTypes;
+  markUnratedSeverity(extras, query.severity);
 
   return buildNistCciTags(nist, cci, extras);
 }
@@ -200,8 +213,16 @@ function tagsFor(query: KicsQuery): Record<string, unknown> {
  *
  * That makes the compliance percentage misleading on its own: a scan where 72
  * of 2,034 queries fired renders as 100% failed. This requirement carries the
- * denominator so the ratio is legible. Impact 0 keeps it out of the score,
- * matching buildNoFindingsRequirement.
+ * denominator so the ratio is legible.
+ *
+ * Impact 0 and status notApplicable both keep it out of the score: the
+ * effective-status layer (computeEffectiveStatus) maps impact-0 requirements
+ * to notApplicable before statuses are counted, and notApplicable is the one
+ * status the compliance rollup excludes from both numerator and denominator.
+ * Emitting notApplicable as the raw status too keeps raw-status consumers
+ * agreeing with the effective view — Passed would export to CKL as
+ * NotAFinding, a compliant-looking control that was never checked, and count
+ * as a free pass in raw status rollups.
  */
 function buildCoverageRequirement(report: KicsReport, startTime: Date): EvaluatedRequirement {
   const executed = report.queries_total ?? 0;
@@ -218,7 +239,7 @@ function buildCoverageRequirement(report: KicsReport, startTime: Date): Evaluate
     title: 'KICS scan coverage',
     impact: 0,
     descriptions: [{ label: 'default', data: summary }],
-    results: [{ status: ResultStatus.Passed, codeDesc: summary, startTime }],
+    results: [{ status: ResultStatus.NotApplicable, codeDesc: summary, startTime }],
     tags: {
       queriesExecuted: executed,
       queriesWithFindings: fired,
@@ -243,9 +264,10 @@ function buildRequirement(query: KicsQuery, startTime: Date): EvaluatedRequireme
     startTime,
   }));
 
+  // || not ??: empty-string identity fields fall through, matching Go.
   const requirement = createRequirement(
-    query.query_id ?? query.query_name ?? 'unknown',
-    query.query_name ?? query.query_id ?? 'Unnamed KICS query',
+    query.query_id || query.query_name || 'unknown',
+    query.query_name || query.query_id || 'Unnamed KICS query',
     descriptions,
     impactFor(query.severity),
     results,
@@ -279,7 +301,10 @@ export async function convertKicsToHdf(
   }
 
   const report = parseJSON<KicsReport>(input);
-  if (!Array.isArray(report.queries) || report.kics_version === undefined) {
+  // Type-check, not just presence: a non-string version would flow into
+  // tool.version as a JSON number (schema-invalid). Mirrors the fingerprint's
+  // checks so convert and auto-detect agree, and matches Go's typed probe.
+  if (!Array.isArray(report.queries) || typeof report.kics_version !== 'string') {
     throw new Error('kics: input does not look like a KICS report');
   }
 

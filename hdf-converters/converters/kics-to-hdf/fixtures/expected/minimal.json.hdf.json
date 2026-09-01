@@ -11,9 +11,9 @@
           ],
           "results": [
             {
-              "codeDesc": "File: ../../path/main.tf\nLine: 25\nResource type: aws_db_instance\nResource: records\nKey: aws_db_instance[records]",
+              "codeDesc": "File: ../../path/main.tf\nLine: 25\nResource type: aws_db_instance\nResource: records\nKey: aws_db_instance[records]\nSimilarity ID: 4efca9c9c9328e651ec53a8d38e4c3b25f5940cd2e3eb9ca1ef6a5625cf2dab0",
               "message": "Expected: 'storage_encrypted' should be set to true\nActual: 'storage_encrypted' is undefined or null\nIssue type: MissingAttribute",
-              "startTime": "2026-08-23T12:38:27.789783Z",
+              "startTime": "2026-08-26T18:36:21.742352Z",
               "status": "failed"
             }
           ],
@@ -37,6 +37,7 @@
             ],
             "nistMapping": "cwe-derived",
             "platform": "Terraform",
+            "queryUrl": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/db_instance#storage_encrypted",
             "resourceType": [
               "aws_db_instance"
             ],
@@ -57,8 +58,8 @@
           "results": [
             {
               "codeDesc": "KICS executed 1100 queries against 1 file(s) (1 parsed); 1 produced findings. KICS reports violations only and does not enumerate the queries that ran without finding anything, so no passing requirements can be derived from its output and the compliance ratio should not be read as a pass rate.",
-              "startTime": "2026-08-23T12:38:27.789783Z",
-              "status": "passed"
+              "startTime": "2026-08-26T18:36:21.742352Z",
+              "status": "notApplicable"
             }
           ],
           "id": "kics-scan-coverage",
@@ -76,7 +77,7 @@
       ],
       "resultsChecksum": {
         "algorithm": "sha256",
-        "value": "5c951a95dbe5fe051a2c11a2719b602caabccc9a58918637db4c3bbf635c95f9"
+        "value": "87293b772e5f52da501540613c5ae88e91e0735b1790030164ab1d1a40a0bfc9"
       },
       "name": "KICS Scan",
       "title": "KICS infrastructure-as-code scan"
@@ -86,7 +87,7 @@
     "name": "kics-to-hdf",
     "version": "1.0.0"
   },
-  "timestamp": "2026-08-23T12:38:27.789783Z",
+  "timestamp": "2026-08-26T18:36:21.742352Z",
   "tool": {
     "format": "json",
     "name": "KICS",

@@ -11,9 +11,9 @@
           ],
           "results": [
             {
-              "codeDesc": "File: ../../path/main.tf\nLine: 25\nResource type: aws_db_instance\nResource: records\nKey: aws_db_instance[records]",
+              "codeDesc": "File: ../../path/main.tf\nLine: 25\nResource type: aws_db_instance\nResource: records\nKey: aws_db_instance[records]\nSimilarity ID: 4efca9c9c9328e651ec53a8d38e4c3b25f5940cd2e3eb9ca1ef6a5625cf2dab0",
               "message": "Expected: 'storage_encrypted' should be set to true\nActual: 'storage_encrypted' is undefined or null\nIssue type: MissingAttribute",
-              "startTime": "2026-08-23T12:38:27.786587Z",
+              "startTime": "2026-08-26T18:36:21.740757Z",
               "status": "failed"
             }
           ],
@@ -37,6 +37,7 @@
             ],
             "nistMapping": "cwe-derived",
             "platform": "Terraform",
+            "queryUrl": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/db_instance#storage_encrypted",
             "resourceType": [
               "aws_db_instance"
             ],
@@ -56,9 +57,9 @@
           ],
           "results": [
             {
-              "codeDesc": "File: ../../path/main.tf\nLine: 17\nResource type: aws_security_group\nResource: example-open\nKey: aws_security_group[ingress_all].ingress",
+              "codeDesc": "File: ../../path/main.tf\nLine: 17\nResource type: aws_security_group\nResource: example-open\nKey: aws_security_group[ingress_all].ingress\nSimilarity ID: 9dbff16a6c0c14f73d415aaff331196059d11c552fff0288b84acb2462dbecb6",
               "message": "Expected: SSH (TCP:22) should not be allowed\nActual: SSH (TCP:22) is allowed\nIssue type: IncorrectValue\nSearch value: TCP,22",
-              "startTime": "2026-08-23T12:38:27.786587Z",
+              "startTime": "2026-08-26T18:36:21.740757Z",
               "status": "failed"
             }
           ],
@@ -82,6 +83,7 @@
             ],
             "nistMapping": "cwe-derived",
             "platform": "Terraform",
+            "queryUrl": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group",
             "resourceType": [
               "aws_security_group"
             ],
@@ -101,9 +103,9 @@
           ],
           "results": [
             {
-              "codeDesc": "File: ../../path/main.tf\nLine: 21\nResource type: aws_security_group\nResource: example-open\nKey: aws_security_group[ingress_all].ingress.cidr_blocks",
+              "codeDesc": "File: ../../path/main.tf\nLine: 21\nResource type: aws_security_group\nResource: example-open\nKey: aws_security_group[ingress_all].ingress.cidr_blocks\nSimilarity ID: c69e33189fa2e8f28646c2ca82654121f4b2372b03838ed353522b4d11223e0c",
               "message": "Expected: aws_security_group[ingress_all].ingress.cidr_blocks should not contain '0.0.0.0/0'\nActual: aws_security_group[ingress_all].ingress.cidr_blocks contains '0.0.0.0/0'\nIssue type: IncorrectValue",
-              "startTime": "2026-08-23T12:38:27.786587Z",
+              "startTime": "2026-08-26T18:36:21.740757Z",
               "status": "failed"
             }
           ],
@@ -129,6 +131,7 @@
             ],
             "nistMapping": "static-fallback",
             "platform": "Terraform",
+            "queryUrl": "https://www.terraform.io/docs/providers/aws/r/security_group.html",
             "resourceType": [
               "aws_security_group"
             ],
@@ -147,9 +150,9 @@
           ],
           "results": [
             {
-              "codeDesc": "File: ../../path/main.tf\nLine: 9\nResource type: aws_cloudwatch_log_group\nResource: example-audit-log\nKey: aws_cloudwatch_log_group[audit]",
+              "codeDesc": "File: ../../path/main.tf\nLine: 9\nResource type: aws_cloudwatch_log_group\nResource: example-audit-log\nKey: aws_cloudwatch_log_group[audit]\nSimilarity ID: 2737ae3898f04339f701da0891accf68690355971adb9ff9d4351b0db104d7b0",
               "message": "Expected: Attribute 'kms_key_id' should be set\nActual: Attribute 'kms_key_id' is undefined\nIssue type: MissingAttribute",
-              "startTime": "2026-08-23T12:38:27.786587Z",
+              "startTime": "2026-08-26T18:36:21.740757Z",
               "status": "failed"
             }
           ],
@@ -173,6 +176,7 @@
             ],
             "nistMapping": "cwe-derived",
             "platform": "Terraform",
+            "queryUrl": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_log_group",
             "resourceType": [
               "aws_cloudwatch_log_group"
             ],
@@ -192,9 +196,9 @@
           ],
           "results": [
             {
-              "codeDesc": "File: ../../path/main.tf\nLine: 25\nResource type: aws_db_instance\nResource: records\nKey: aws_db_instance[records]",
+              "codeDesc": "File: ../../path/main.tf\nLine: 25\nResource type: aws_db_instance\nResource: records\nKey: aws_db_instance[records]\nSimilarity ID: c0ea4d7eea7783d1d62230e39bca8f7038d3b66b4620c12429412ea4a99a24b2",
               "message": "Expected: 'iam_database_authentication_enabled' should be set to true\nActual: 'iam_database_authentication_enabled' is undefined or null\nIssue type: MissingAttribute",
-              "startTime": "2026-08-23T12:38:27.786587Z",
+              "startTime": "2026-08-26T18:36:21.740757Z",
               "status": "failed"
             }
           ],
@@ -218,6 +222,7 @@
             ],
             "nistMapping": "cwe-derived",
             "platform": "Terraform",
+            "queryUrl": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/db_instance#iam_database_authentication_enabled",
             "resourceType": [
               "aws_db_instance"
             ],
@@ -237,9 +242,9 @@
           ],
           "results": [
             {
-              "codeDesc": "File: ../../path/main.tf\nLine: 25\nResource type: aws_db_instance\nResource: records\nKey: aws_db_instance[records]",
+              "codeDesc": "File: ../../path/main.tf\nLine: 25\nResource type: aws_db_instance\nResource: records\nKey: aws_db_instance[records]\nSimilarity ID: aa9b25b02db038eaf33bc851204ff93185b9ca45e4cf5ca0631bf741fe96d307",
               "message": "Expected: 'backup_retention_period' should be defined, and bigger than '0'\nActual: 'backup_retention_period' is not defined\nIssue type: MissingAttribute",
-              "startTime": "2026-08-23T12:38:27.786587Z",
+              "startTime": "2026-08-26T18:36:21.740757Z",
               "status": "failed"
             }
           ],
@@ -265,6 +270,7 @@
             ],
             "nistMapping": "static-fallback",
             "platform": "Terraform",
+            "queryUrl": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/db_instance",
             "resourceType": [
               "aws_db_instance"
             ],
@@ -283,9 +289,9 @@
           ],
           "results": [
             {
-              "codeDesc": "File: ../../path/main.tf\nLine: 25\nResource type: aws_db_instance\nResource: records\nKey: aws_db_instance[records]",
+              "codeDesc": "File: ../../path/main.tf\nLine: 25\nResource type: aws_db_instance\nResource: records\nKey: aws_db_instance[records]\nSimilarity ID: 8bce8f99bcf15e7fe7a561230081f82d5a3abab3c9d0f18f09df798771aab847",
               "message": "Expected: 'enabled_cloudwatch_logs_exports' should be defined\nActual: 'enabled_cloudwatch_logs_exports' is undefined\nIssue type: MissingAttribute",
-              "startTime": "2026-08-23T12:38:27.786587Z",
+              "startTime": "2026-08-26T18:36:21.740757Z",
               "status": "failed"
             }
           ],
@@ -311,6 +317,7 @@
             ],
             "nistMapping": "static-fallback",
             "platform": "Terraform",
+            "queryUrl": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/db_instance#enabled_cloudwatch_logs_exports",
             "resourceType": [
               "aws_db_instance"
             ],
@@ -329,9 +336,9 @@
           ],
           "results": [
             {
-              "codeDesc": "File: ../../path/main.tf\nLine: 5\nResource type: aws_s3_bucket\nResource: example-compliance-reports\nKey: aws_s3_bucket[reports]",
+              "codeDesc": "File: ../../path/main.tf\nLine: 5\nResource type: aws_s3_bucket\nResource: example-compliance-reports\nKey: aws_s3_bucket[reports]\nSimilarity ID: dd089a52c29b900af06e5b47519c09c5eb39a385b4f6c461bfb0a9c5f778bb7b",
               "message": "Expected: 'logging' should be defined and not null\nActual: 'logging' is undefined or null\nIssue type: MissingAttribute",
-              "startTime": "2026-08-23T12:38:27.786587Z",
+              "startTime": "2026-08-26T18:36:21.740757Z",
               "status": "failed"
             }
           ],
@@ -357,6 +364,7 @@
             ],
             "nistMapping": "static-fallback",
             "platform": "Terraform",
+            "queryUrl": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket",
             "resourceType": [
               "aws_s3_bucket"
             ],
@@ -375,9 +383,9 @@
           ],
           "results": [
             {
-              "codeDesc": "File: ../../path/main.tf\nLine: 5\nResource type: aws_s3_bucket\nResource: example-compliance-reports\nKey: aws_s3_bucket[reports]",
+              "codeDesc": "File: ../../path/main.tf\nLine: 5\nResource type: aws_s3_bucket\nResource: example-compliance-reports\nKey: aws_s3_bucket[reports]\nSimilarity ID: ab0463edcbd0e2152adcf6337f249a8f1737944f824e5a6d58844f087abd7de4",
               "message": "Expected: 'versioning' should be true\nActual: 'versioning' is undefined or null\nIssue type: MissingAttribute",
-              "startTime": "2026-08-23T12:38:27.786587Z",
+              "startTime": "2026-08-26T18:36:21.740757Z",
               "status": "failed"
             }
           ],
@@ -403,6 +411,7 @@
             ],
             "nistMapping": "static-fallback",
             "platform": "Terraform",
+            "queryUrl": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/s3_bucket#versioning",
             "resourceType": [
               "aws_s3_bucket"
             ],
@@ -421,9 +430,9 @@
           ],
           "results": [
             {
-              "codeDesc": "File: ../../path/main.tf\nLine: 17\nResource type: aws_security_group\nResource: example-open\nKey: aws_security_group[ingress_all].ingress",
+              "codeDesc": "File: ../../path/main.tf\nLine: 17\nResource type: aws_security_group\nResource: example-open\nKey: aws_security_group[ingress_all].ingress\nSimilarity ID: bfe9fa20120795e5de7b809e51ebcfc9bf0d39a3a9ae523258eabb7c83cf3d27",
               "message": "Expected: aws_security_group[ingress_all].ingress 'SSH' (Port:22) should not be open\nActual: aws_security_group[ingress_all].ingress 'SSH' (Port:22) is open\nIssue type: IncorrectValue",
-              "startTime": "2026-08-23T12:38:27.786587Z",
+              "startTime": "2026-08-26T18:36:21.740757Z",
               "status": "failed"
             }
           ],
@@ -447,6 +456,7 @@
             ],
             "nistMapping": "cwe-derived",
             "platform": "Terraform",
+            "queryUrl": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group",
             "resourceType": [
               "aws_security_group"
             ],
@@ -466,9 +476,9 @@
           ],
           "results": [
             {
-              "codeDesc": "File: ../../path/main.tf\nLine: 5\nResource type: n/a\nResource: n/a\nKey: resource",
+              "codeDesc": "File: ../../path/main.tf\nLine: 5\nResource type: n/a\nResource: n/a\nKey: resource\nSimilarity ID: 0a7d0464de505a54720d6002d14a22a32e6b20bb8189d444ab621d8ab838304f",
               "message": "Expected: 'aws_accessanalyzer_analyzer' should be set\nActual: 'aws_accessanalyzer_analyzer' is undefined\nIssue type: MissingAttribute",
-              "startTime": "2026-08-23T12:38:27.786587Z",
+              "startTime": "2026-08-26T18:36:21.740757Z",
               "status": "failed"
             }
           ],
@@ -494,6 +504,7 @@
             ],
             "nistMapping": "static-fallback",
             "platform": "Terraform",
+            "queryUrl": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/accessanalyzer_analyzer",
             "resourceType": [
               "n/a"
             ],
@@ -512,9 +523,9 @@
           ],
           "results": [
             {
-              "codeDesc": "File: ../../path/main.tf\nLine: 25\nResource type: aws_db_instance\nResource: records\nKey: aws_db_instance[records]",
+              "codeDesc": "File: ../../path/main.tf\nLine: 25\nResource type: aws_db_instance\nResource: records\nKey: aws_db_instance[records]\nSimilarity ID: a1b2703a2862822f18cb98f8d043de10c8bd2b8cf58d0d89fc6677ec686268c4",
               "message": "Expected: 'aws_db_instance[records].copy_tags_to_snapshot' should be defined to true\nActual: 'aws_db_instance[records].copy_tags_to_snapshot' is not defined\nIssue type: MissingAttribute",
-              "startTime": "2026-08-23T12:38:27.786587Z",
+              "startTime": "2026-08-26T18:36:21.740757Z",
               "status": "failed"
             }
           ],
@@ -538,6 +549,7 @@
             ],
             "nistMapping": "cwe-derived",
             "platform": "Terraform",
+            "queryUrl": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/rds_cluster#copy_tags_to_snapshot",
             "resourceType": [
               "aws_db_instance"
             ],
@@ -557,14 +569,14 @@
           ],
           "results": [
             {
-              "codeDesc": "File: ../../path/main.tf\nLine: 9\nResource type: aws_cloudwatch_log_group\nResource: example-audit-log\nKey: aws_cloudwatch_log_group[audit]",
+              "codeDesc": "File: ../../path/main.tf\nLine: 9\nResource type: aws_cloudwatch_log_group\nResource: example-audit-log\nKey: aws_cloudwatch_log_group[audit]\nSimilarity ID: 827beaf01470560c7f380d69f421b6af5460cf87cca1768b693b3d8bbb20b4e3",
               "message": "Expected: Attribute 'retention_in_days' should be set and valid\nActual: Attribute 'retention_in_days' is undefined\nIssue type: MissingAttribute",
-              "startTime": "2026-08-23T12:38:27.786587Z",
+              "startTime": "2026-08-26T18:36:21.740757Z",
               "status": "failed"
             }
           ],
           "id": "ef0b316a-211e-42f1-888e-64efe172b755",
-          "impact": 0.1,
+          "impact": 0,
           "tags": {
             "category": "Observability",
             "cci": [
@@ -585,6 +597,7 @@
             ],
             "nistMapping": "static-fallback",
             "platform": "Terraform",
+            "queryUrl": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/cloudwatch_log_group",
             "resourceType": [
               "aws_cloudwatch_log_group"
             ],
@@ -603,32 +616,32 @@
           ],
           "results": [
             {
-              "codeDesc": "File: ../../path/main.tf\nLine: 25\nResource type: aws_db_instance\nResource: records\nKey: aws_db_instance[{{records}}]",
+              "codeDesc": "File: ../../path/main.tf\nLine: 25\nResource type: aws_db_instance\nResource: records\nKey: aws_db_instance[{{records}}]\nSimilarity ID: dabf4bc35ee0177cb62ac970c459db6e210ea48cf48f3a24e3a23a1d074029f5",
               "message": "Expected: aws_db_instance[{{records}}].tags should be defined and not null\nActual: aws_db_instance[{{records}}].tags is undefined or null\nIssue type: MissingAttribute",
-              "startTime": "2026-08-23T12:38:27.786587Z",
+              "startTime": "2026-08-26T18:36:21.740757Z",
               "status": "failed"
             },
             {
-              "codeDesc": "File: ../../path/main.tf\nLine: 5\nResource type: aws_s3_bucket\nResource: reports\nKey: aws_s3_bucket[{{reports}}]",
+              "codeDesc": "File: ../../path/main.tf\nLine: 5\nResource type: aws_s3_bucket\nResource: reports\nKey: aws_s3_bucket[{{reports}}]\nSimilarity ID: 26c1c65539921002d1aea7581c6d8acc41ea9c1f7b552b4a444d0e47aa548c93",
               "message": "Expected: aws_s3_bucket[{{reports}}].tags should be defined and not null\nActual: aws_s3_bucket[{{reports}}].tags is undefined or null\nIssue type: MissingAttribute",
-              "startTime": "2026-08-23T12:38:27.786587Z",
+              "startTime": "2026-08-26T18:36:21.740757Z",
               "status": "failed"
             },
             {
-              "codeDesc": "File: ../../path/main.tf\nLine: 13\nResource type: aws_security_group\nResource: example-open\nKey: aws_security_group[{{ingress_all}}]",
+              "codeDesc": "File: ../../path/main.tf\nLine: 13\nResource type: aws_security_group\nResource: example-open\nKey: aws_security_group[{{ingress_all}}]\nSimilarity ID: 4405b311b47b3a3b2326ddafb88c9d4f4e513a675fcec5ff87f635b4d3fe6ff5",
               "message": "Expected: aws_security_group[{{ingress_all}}].tags should be defined and not null\nActual: aws_security_group[{{ingress_all}}].tags is undefined or null\nIssue type: MissingAttribute",
-              "startTime": "2026-08-23T12:38:27.786587Z",
+              "startTime": "2026-08-26T18:36:21.740757Z",
               "status": "failed"
             },
             {
-              "codeDesc": "File: ../../path/main.tf\nLine: 9\nResource type: aws_cloudwatch_log_group\nResource: example-audit-log\nKey: aws_cloudwatch_log_group[{{audit}}]",
+              "codeDesc": "File: ../../path/main.tf\nLine: 9\nResource type: aws_cloudwatch_log_group\nResource: example-audit-log\nKey: aws_cloudwatch_log_group[{{audit}}]\nSimilarity ID: 1b05b071bac6ac0198c9b8425698cfbcd37aa31610f34e3dcff587994c4f34d0",
               "message": "Expected: aws_cloudwatch_log_group[{{audit}}].tags should be defined and not null\nActual: aws_cloudwatch_log_group[{{audit}}].tags is undefined or null\nIssue type: MissingAttribute",
-              "startTime": "2026-08-23T12:38:27.786587Z",
+              "startTime": "2026-08-26T18:36:21.740757Z",
               "status": "failed"
             }
           ],
           "id": "e38a8e0a-b88b-4902-b3fe-b0fcb17d5c10",
-          "impact": 0.1,
+          "impact": 0,
           "tags": {
             "category": "Best Practices",
             "cci": [
@@ -649,6 +662,7 @@
             ],
             "nistMapping": "static-fallback",
             "platform": "Terraform",
+            "queryUrl": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/guides/resource-tagging",
             "resourceType": [
               "aws_db_instance",
               "aws_s3_bucket",
@@ -670,14 +684,14 @@
           ],
           "results": [
             {
-              "codeDesc": "File: ../../path/main.tf\nLine: 13\nResource type: aws_security_group\nResource: example-open\nKey: aws_security_group[ingress_all]",
+              "codeDesc": "File: ../../path/main.tf\nLine: 13\nResource type: aws_security_group\nResource: example-open\nKey: aws_security_group[ingress_all]\nSimilarity ID: eaeb0a34f2e1fec1d3728544ba681e17e6b431a6b9fa284ffbe5b0aa00ccf9e9",
               "message": "Expected: 'aws_security_group[ingress_all]' should be used\nActual: 'aws_security_group[ingress_all]' is not used\nIssue type: IncorrectValue",
-              "startTime": "2026-08-23T12:38:27.786587Z",
+              "startTime": "2026-08-26T18:36:21.740757Z",
               "status": "failed"
             }
           ],
           "id": "4849211b-ac39-479e-ae78-5694d506cb24",
-          "impact": 0.1,
+          "impact": 0,
           "tags": {
             "category": "Access Control",
             "cci": [
@@ -696,6 +710,7 @@
             ],
             "nistMapping": "cwe-derived",
             "platform": "Terraform",
+            "queryUrl": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group",
             "resourceType": [
               "aws_security_group"
             ],
@@ -715,14 +730,14 @@
           ],
           "results": [
             {
-              "codeDesc": "File: ../../path/main.tf\nLine: 17\nResource type: aws_security_group\nResource: ingress_all\nKey: aws_security_group[ingress_all].ingress",
+              "codeDesc": "File: ../../path/main.tf\nLine: 17\nResource type: aws_security_group\nResource: ingress_all\nKey: aws_security_group[ingress_all].ingress\nSimilarity ID: d9ddb43d6e48365b19f5517f58aa5656a7a5c068b499c46d7f5bc8425ba0ec59",
               "message": "Expected: aws_security_group[ingress_all].ingress.description should be defined and not null\nActual: aws_security_group[ingress_all].ingress.description is undefined or null\nIssue type: MissingAttribute",
-              "startTime": "2026-08-23T12:38:27.786587Z",
+              "startTime": "2026-08-26T18:36:21.740757Z",
               "status": "failed"
             }
           ],
           "id": "68eb4bf3-f9bf-463d-b5cf-e029bb446d2e",
-          "impact": 0.1,
+          "impact": 0,
           "tags": {
             "category": "Best Practices",
             "cci": [
@@ -743,6 +758,7 @@
             ],
             "nistMapping": "static-fallback",
             "platform": "Terraform",
+            "queryUrl": "https://registry.terraform.io/providers/hashicorp/aws/latest/docs/resources/security_group#description",
             "resourceType": [
               "aws_security_group"
             ],
@@ -762,8 +778,8 @@
           "results": [
             {
               "codeDesc": "KICS executed 1100 queries against 1 file(s) (1 parsed); 16 produced findings. KICS reports violations only and does not enumerate the queries that ran without finding anything, so no passing requirements can be derived from its output and the compliance ratio should not be read as a pass rate.",
-              "startTime": "2026-08-23T12:38:27.786587Z",
-              "status": "passed"
+              "startTime": "2026-08-26T18:36:21.740757Z",
+              "status": "notApplicable"
             }
           ],
           "id": "kics-scan-coverage",
@@ -791,7 +807,7 @@
     "name": "kics-to-hdf",
     "version": "1.0.0"
   },
-  "timestamp": "2026-08-23T12:38:27.786587Z",
+  "timestamp": "2026-08-26T18:36:21.740757Z",
   "tool": {
     "format": "json",
     "name": "KICS",

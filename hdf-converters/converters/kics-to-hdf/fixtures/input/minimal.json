@@ -11,10 +11,10 @@
   "queries_failed_to_compute_similarity_id": 0,
   "severity_counters": {
     "CRITICAL": 0,
-    "HIGH": 3,
-    "INFO": 7,
-    "LOW": 2,
-    "MEDIUM": 7,
+    "HIGH": 1,
+    "INFO": 0,
+    "LOW": 0,
+    "MEDIUM": 0,
     "TRACE": 0
   },
   "total_counter": 1,

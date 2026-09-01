@@ -11,30 +11,24 @@ import (
 	"encoding/json"
 	"fmt"
 	"regexp"
+	"strconv"
 	"strings"
 	"time"
 
 	shared "github.com/mitre/hdf-libs/hdf-converters/v3/shared/go"
 	"github.com/mitre/hdf-libs/hdf-mappings/go/v3/cci"
-	cwemap "github.com/mitre/hdf-libs/hdf-mappings/go/v3/cwe"
 	hdf "github.com/mitre/hdf-libs/hdf-schema/dist/go/v3"
 	hdfutil "github.com/mitre/hdf-libs/hdf-utilities/go/v3"
 )
 
-// impactBySeverity mirrors the TypeScript table. KICS publishes five
-// severities; SARIF collapses CRITICAL and HIGH into `error`, and keeping them
-// apart is much of why this converter exists.
-//
-// No level maps to 0: impact 0 reports Not Applicable in HDF and would drop the
-// finding from the compliance score entirely.
-var impactBySeverity = map[string]float64{
-	"critical": 0.9,
-	"high":     0.7,
-	"medium":   0.5,
-	"low":      0.3,
-	"info":     0.1,
-	"trace":    0.1,
-}
+// KICS publishes five severities; SARIF collapses CRITICAL and HIGH into
+// `error`, and keeping them apart is much of why this converter exists. The
+// shared standard map covers four of them, with info at the canonical 0.0
+// tier like every other converter: the effective-status layer maps impact-0
+// requirements to notApplicable, so info-tier findings stay visible in the
+// output without entering the compliance ratio. TRACE is KICS-specific and
+// joins the info tier as an alias.
+var kicsSeverityAliases = map[string]float64{"trace": 0.0}
 
 const defaultImpact = 0.5
 
@@ -55,19 +49,13 @@ const (
 	nistMappingFallback = "static-fallback"
 )
 
-// defaultNistTags is the static-analysis fallback bundle.
-var defaultNistTags = []string{"SA-11", "RA-5"}
-
-var cweDigits = regexp.MustCompile(`^\d+$`)
+var (
+	cweDigits = regexp.MustCompile(`^\d+$`)
+	cwePrefix = regexp.MustCompile(`(?i)^CWE-`)
+)
 
 func impactFor(severity string) float64 {
-	if severity == "" {
-		return defaultImpact
-	}
-	if v, ok := impactBySeverity[strings.ToLower(severity)]; ok {
-		return v
-	}
-	return defaultImpact
+	return hdfutil.SeverityToImpactWithAliases(severity, kicsSeverityAliases, defaultImpact)
 }
 
 // cweIdentifiers normalizes KICS's bare number form, e.g. "778".
@@ -76,7 +64,7 @@ func cweIdentifiers(q Query) []string {
 	if id == "" {
 		return nil
 	}
-	id = regexp.MustCompile(`(?i)^CWE-`).ReplaceAllString(id, "")
+	id = cwePrefix.ReplaceAllString(id, "")
 	if !cweDigits.MatchString(id) {
 		return nil
 	}
@@ -92,21 +80,12 @@ func ResolveControls(q Query, table map[string]MappingEntry) (nist []string, cci
 		return entry.NIST, entry.CCI, nistMappingTable
 	}
 
-	seen := map[string]bool{}
-	var fromCWE []string
-	for _, id := range cweIdentifiers(q) {
-		for _, c := range cwemap.NISTControls(strings.TrimPrefix(id, "CWE-")) {
-			if c != "" && !seen[c] {
-				seen[c] = true
-				fromCWE = append(fromCWE, c)
-			}
-		}
-	}
-	if len(fromCWE) > 0 {
+	// shared.MapCWEToNIST dedups and sorts, matching the TS mapCWEToNIST.
+	if fromCWE := shared.MapCWEToNIST(cweIdentifiers(q), nil); len(fromCWE) > 0 {
 		return fromCWE, cci.NISTToCCI(fromCWE), nistMappingCWE
 	}
 
-	fallback := append([]string(nil), defaultNistTags...)
+	fallback := append([]string(nil), shared.DefaultStaticAnalysisNIST...)
 	return fallback, cci.NISTToCCI(fallback), nistMappingFallback
 }
 
@@ -123,6 +102,10 @@ func locationFor(f File) string {
 	}
 	if f.SearchKey != "" {
 		parts = append(parts, "Key: "+f.SearchKey)
+	}
+	// KICS's own stable per-occurrence fingerprint; the identity SARIF drops.
+	if f.SimilarityID != "" {
+		parts = append(parts, "Similarity ID: "+f.SimilarityID)
 	}
 	return strings.Join(parts, "\n")
 }
@@ -152,6 +135,14 @@ func orUnknown(s string) string {
 		return "unknown"
 	}
 	return s
+}
+
+// jsonValueHasPrefix reports whether a raw JSON value starts with the given
+// byte after leading whitespace — '[' for an array, '"' for a string. A nil
+// raw value (key absent) fails.
+func jsonValueHasPrefix(raw json.RawMessage, prefix byte) bool {
+	trimmed := strings.TrimSpace(string(raw))
+	return len(trimmed) > 0 && trimmed[0] == prefix
 }
 
 func distinct(values []string) []string {
@@ -190,8 +181,20 @@ func tagsFor(q Query) (map[string]any, []string) {
 	if q.Category != "" {
 		tags["category"] = q.Category
 	}
+	if q.QueryURL != "" {
+		tags["queryUrl"] = q.QueryURL
+	}
 	if q.RiskScore != nil {
-		tags["riskScore"] = fmt.Sprintf("%v", q.RiskScore)
+		switch v := q.RiskScore.(type) {
+		case string:
+			tags["riskScore"] = v
+		case float64:
+			// plain decimal notation, matching TS String() for any value in
+			// and far beyond KICS's 0-10 risk_score range
+			tags["riskScore"] = strconv.FormatFloat(v, 'f', -1, 64)
+		default:
+			tags["riskScore"] = fmt.Sprintf("%v", v)
+		}
 	}
 	if q.DescriptionID != "" {
 		tags["descriptionId"] = q.DescriptionID
@@ -211,6 +214,7 @@ func tagsFor(q Query) (map[string]any, []string) {
 	if v := distinct(resource); len(v) > 0 {
 		tags["resourceType"] = v
 	}
+	shared.MarkUnratedSeverity(tags, q.Severity)
 	return tags, nist
 }
 
@@ -222,8 +226,16 @@ func tagsFor(q Query) (map[string]any, []string) {
 // no passing requirement can be derived from it, and a converted profile is
 // failures-only by construction. That makes the compliance percentage
 // misleading on its own: a scan where 72 of 2,034 queries fired renders as 100%
-// failed. Impact 0 keeps this out of the score, matching
-// BuildNoFindingsRequirement.
+// failed. This record carries the denominator so the ratio is legible.
+//
+// Impact 0 and status notApplicable both keep it out of the score: the
+// effective-status layer (ComputeEffectiveStatus) maps impact-0 requirements
+// to notApplicable before statuses are counted, and notApplicable is the one
+// status the compliance rollup excludes from both numerator and denominator.
+// Emitting notApplicable as the raw status too keeps raw-status consumers
+// agreeing with the effective view — Passed would export to CKL as
+// NotAFinding, a compliant-looking control that was never checked, and count
+// as a free pass in raw status rollups.
 func buildCoverageRequirement(report Report, startTime time.Time) hdf.EvaluatedRequirement {
 	fired := 0
 	for _, q := range report.Queries {
@@ -253,7 +265,7 @@ func buildCoverageRequirement(report Report, startTime time.Time) hdf.EvaluatedR
 			"queriesFailedToExecute": report.QueriesFailedToRun,
 		},
 		Results: []hdf.RequirementResult{{
-			Status:    hdf.Passed,
+			Status:    hdf.NotApplicable,
 			CodeDesc:  summary,
 			StartTime: startTime,
 		}},
@@ -284,6 +296,9 @@ func buildRequirement(q Query, startTime time.Time) hdf.EvaluatedRequirement {
 	if title == "" {
 		title = q.QueryID
 	}
+	if title == "" {
+		title = "Unnamed KICS query"
+	}
 	return hdf.EvaluatedRequirement{
 		ID:                 orUnknown(id),
 		Title:              &title,
@@ -309,10 +324,10 @@ func ConvertKicsToHDF(input []byte, converterVersion string) (*hdf.HDFResults, e
 	if err := json.Unmarshal(input, &probe); err != nil {
 		return nil, fmt.Errorf("kics: failed to parse report: %w", err)
 	}
-	if _, ok := probe["queries"]; !ok {
-		return nil, fmt.Errorf("kics: input does not look like a KICS report")
-	}
-	if _, ok := probe["kics_version"]; !ok {
+	// Type-check, not just presence: a truncated or filtered report with
+	// queries:null must not convert to a clean no-findings document. Mirrors
+	// the fingerprint's array/string checks so convert and auto-detect agree.
+	if !jsonValueHasPrefix(probe["queries"], '[') || !jsonValueHasPrefix(probe["kics_version"], '"') {
 		return nil, fmt.Errorf("kics: input does not look like a KICS report")
 	}
 
