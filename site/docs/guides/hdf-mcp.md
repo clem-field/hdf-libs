@@ -218,3 +218,26 @@ attestation amendments for `notReviewed` requirements, or applying a VEX
 document as amendments — ship as a **usage Skill**, not as MCP prompts.
 See `.claude/commands/hdf-mcp-workflows.md` for the tool sequencing each
 workflow needs.
+
+## Worked example — the HDF MCP by example
+
+For a runnable, end-to-end primer on using this server well — wiring an MCP
+client over stdio, the normalize-once-then-query pipeline, read-tool
+sequencing, and the handle/source model — see the
+[**`hdf-mcp-demo`**](https://github.com/mitre/hdf-mcp-demo) example-consumer
+project (a sibling to `hdf-conmon-demo`; it drives the shipped `hdf` binary,
+importing nothing private to this repo).
+
+It also measures *why* the bounded, normalized surface is cheaper for an
+agent than reading raw scans into context. Across five real scan formats
+(SAST, DAST, vulnerability, SBOM inventory, and CCE compliance) it compares
+the tokens an HDF MCP response costs against the raw files — model-free and
+reproducible offline — and then puts the same questions to a real model, so
+the ideal saving can be checked against what an agent actually spends.
+
+It reports the cases where HDF *loses*, including questions the bounded read
+surface cannot answer at all. Conversion is not lossy here: the scanner's
+original finding is preserved verbatim in the requirement's `code`. But no
+read tool projects `code`, so an agent asking for a tool-specific field must
+fall back to the raw scan and the normalized surface buys it nothing. See
+the repo for the current measured figures.
