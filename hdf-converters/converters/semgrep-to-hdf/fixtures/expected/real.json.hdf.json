@@ -3,6 +3,9 @@
     {
       "requirements": [
         {
+          "cwe": [
+            "CWE-78"
+          ],
           "descriptions": [
             {
               "data": "Found 'subprocess' function 'run' with 'shell=True'. This is dangerous because this call will spawn the command using a shell process. Doing so propagates current shell settings and variables, which makes it much easier for a malicious actor to execute commands. Use 'shell=False' instead.",
@@ -13,10 +16,14 @@
             {
               "codeDesc": "Path: app/handlers.py, line 7",
               "message": "Suggested fix -- replace the matched code with:\nFalse",
-              "startTime": "2026-08-21T21:34:15.18429Z",
+              "startTime": "2026-09-02T01:41:58.082358Z",
               "status": "failed"
             }
           ],
+          "sourceLocation": {
+            "line": 7,
+            "ref": "app/handlers.py"
+          },
           "id": "python.lang.security.audit.subprocess-shell-true.subprocess-shell-true",
           "impact": 0.7,
           "tags": {
@@ -38,13 +45,6 @@
               "A03:2021 - Injection",
               "A05:2025 - Injection"
             ],
-            "references": [
-              "https://stackoverflow.com/questions/3172470/actual-meaning-of-shell-true-in-subprocess",
-              "https://docs.python.org/3/library/subprocess.html",
-              "https://semgrep.dev/r/python.lang.security.audit.subprocess-shell-true.subprocess-shell-true",
-              "https://sg.run/J92w",
-              "https://bandit.readthedocs.io/en/latest/plugins/b602_subprocess_popen_with_shell_equals_true.html"
-            ],
             "semgrepImpact": "LOW",
             "severity": "ERROR",
             "subcategory": [
@@ -57,11 +57,32 @@
               "Command Injection"
             ]
           },
+          "code": "{\n  \"check_id\": \"python.lang.security.audit.subprocess-shell-true.subprocess-shell-true\",\n  \"path\": \"app/handlers.py\",\n  \"start\": {\n    \"line\": 7,\n    \"col\": 36\n  },\n  \"end\": {\n    \"line\": 7,\n    \"col\": 40\n  },\n  \"extra\": {\n    \"message\": \"Found 'subprocess' function 'run' with 'shell=True'. This is dangerous because this call will spawn the command using a shell process. Doing so propagates current shell settings and variables, which makes it much easier for a malicious actor to execute commands. Use 'shell=False' instead.\",\n    \"severity\": \"ERROR\",\n    \"fix\": \"False\"\n  }\n}",
           "controlType": "technical",
+          "refs": [
+            {
+              "url": "https://stackoverflow.com/questions/3172470/actual-meaning-of-shell-true-in-subprocess"
+            },
+            {
+              "url": "https://docs.python.org/3/library/subprocess.html"
+            },
+            {
+              "url": "https://semgrep.dev/r/python.lang.security.audit.subprocess-shell-true.subprocess-shell-true"
+            },
+            {
+              "url": "https://sg.run/J92w"
+            },
+            {
+              "url": "https://bandit.readthedocs.io/en/latest/plugins/b602_subprocess_popen_with_shell_equals_true.html"
+            }
+          ],
           "title": "Subprocess Shell True",
           "verificationMethod": "automated"
         },
         {
+          "cwe": [
+            "CWE-939"
+          ],
           "descriptions": [
             {
               "data": "Detected a dynamic value being used with urllib. urllib supports 'file://' schemes, so a dynamic value controlled by a malicious actor may allow them to read arbitrary files. Audit uses of urllib calls to ensure user data cannot control the URLs, or consider using the 'requests' library instead.",
@@ -72,10 +93,14 @@
             {
               "codeDesc": "Path: app/handlers.py, line 12",
               "message": "",
-              "startTime": "2026-08-21T21:34:15.18429Z",
+              "startTime": "2026-09-02T01:41:58.082358Z",
               "status": "failed"
             }
           ],
+          "sourceLocation": {
+            "line": 12,
+            "ref": "app/handlers.py"
+          },
           "id": "python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected",
           "impact": 0.5,
           "tags": {
@@ -104,13 +129,6 @@
             "owasp": [
               "A01:2017 - Injection"
             ],
-            "references": [
-              "https://cwe.mitre.org/data/definitions/939.html",
-              "https://semgrep.dev/r/python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected",
-              "https://sg.run/dKZZ",
-              "https://github.com/PyCQA/bandit/blob/b1411bfb43795d3ffd268bef17a839dee954c2b1/bandit/blacklists/calls.py#L163",
-              "https://github.com/OWASP/ASVS/blob/master/4.0/en/0x13-V5-Validation-Sanitization-Encoding.md#v52-sanitization-and-sandboxing-requirements"
-            ],
             "semgrepImpact": "LOW",
             "severity": "WARNING",
             "subcategory": [
@@ -123,8 +141,49 @@
               "Improper Authorization"
             ]
           },
+          "code": "{\n  \"check_id\": \"python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected\",\n  \"path\": \"app/handlers.py\",\n  \"start\": {\n    \"line\": 12,\n    \"col\": 10\n  },\n  \"end\": {\n    \"line\": 12,\n    \"col\": 49\n  },\n  \"extra\": {\n    \"message\": \"Detected a dynamic value being used with urllib. urllib supports 'file://' schemes, so a dynamic value controlled by a malicious actor may allow them to read arbitrary files. Audit uses of urllib calls to ensure user data cannot control the URLs, or consider using the 'requests' library instead.\",\n    \"severity\": \"WARNING\"\n  }\n}",
+          "refs": [
+            {
+              "url": "https://cwe.mitre.org/data/definitions/939.html"
+            },
+            {
+              "url": "https://semgrep.dev/r/python.lang.security.audit.dynamic-urllib-use-detected.dynamic-urllib-use-detected"
+            },
+            {
+              "url": "https://sg.run/dKZZ"
+            },
+            {
+              "url": "https://github.com/PyCQA/bandit/blob/b1411bfb43795d3ffd268bef17a839dee954c2b1/bandit/blacklists/calls.py#L163"
+            },
+            {
+              "url": "https://github.com/OWASP/ASVS/blob/master/4.0/en/0x13-V5-Validation-Sanitization-Encoding.md#v52-sanitization-and-sandboxing-requirements"
+            }
+          ],
           "title": "Dynamic Urllib Use Detected",
           "verificationMethod": "automated"
+        },
+        {
+          "descriptions": [
+            {
+              "data": "Semgrep scanned 1 file(s); 2 rule(s) produced findings and 0 scan error(s) were reported. Semgrep reports violations only and does not enumerate the rules that ran without finding anything, so no passing requirements can be derived from its output and the compliance ratio should not be read as a pass rate.",
+              "label": "default"
+            }
+          ],
+          "results": [
+            {
+              "codeDesc": "Semgrep scanned 1 file(s); 2 rule(s) produced findings and 0 scan error(s) were reported. Semgrep reports violations only and does not enumerate the rules that ran without finding anything, so no passing requirements can be derived from its output and the compliance ratio should not be read as a pass rate.",
+              "startTime": "2026-09-02T01:41:58.082358Z",
+              "status": "notApplicable"
+            }
+          ],
+          "id": "semgrep-scan-coverage",
+          "impact": 0,
+          "tags": {
+            "filesScanned": 1,
+            "rulesWithFindings": 2,
+            "scanErrors": 0
+          },
+          "title": "Semgrep scan coverage"
         }
       ],
       "resultsChecksum": {
@@ -139,9 +198,8 @@
     "name": "semgrep-to-hdf",
     "version": "1.0.0"
   },
-  "timestamp": "2026-08-21T21:34:15.18429Z",
+  "timestamp": "2026-09-02T01:41:58.082358Z",
   "tool": {
-    "format": "json",
     "name": "Semgrep",
     "version": "1.174.0"
   }

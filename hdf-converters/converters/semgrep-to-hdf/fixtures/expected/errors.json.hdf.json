@@ -3,6 +3,10 @@
     {
       "requirements": [
         {
+          "cwe": [
+            "CWE-1357",
+            "CWE-353"
+          ],
           "descriptions": [
             {
               "data": "GitHub Actions step uses a mutable tag or branch reference. Tags and branch names can be silently repointed by the action owner, enabling supply-chain attacks — as seen in the trivy-action and kics-github-action compromises. Pin the reference to a full 40-character commit SHA instead, e.g. `uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608`.",
@@ -13,10 +17,14 @@
             {
               "codeDesc": "Path: .github/workflows/build.yml, line 7",
               "message": "",
-              "startTime": "2026-08-21T21:34:15.183179Z",
+              "startTime": "2026-09-02T01:41:58.079677Z",
               "status": "failed"
             }
           ],
+          "sourceLocation": {
+            "line": 7,
+            "ref": ".github/workflows/build.yml"
+          },
           "id": "yaml.github-actions.security.github-actions-mutable-action-tag.github-actions-mutable-action-tag",
           "impact": 0.5,
           "tags": {
@@ -40,11 +48,6 @@
               "A08:2021 - Software and Data Integrity Failures",
               "A08:2025 - Software and Data Integrity Failures"
             ],
-            "references": [
-              "https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-third-party-actions",
-              "https://semgrep.dev/r/yaml.github-actions.security.github-actions-mutable-action-tag.github-actions-mutable-action-tag",
-              "https://sg.run/2LgAL"
-            ],
             "semgrepImpact": "HIGH",
             "severity": "WARNING",
             "subcategory": [
@@ -58,10 +61,25 @@
               "Other"
             ]
           },
+          "code": "{\n  \"check_id\": \"yaml.github-actions.security.github-actions-mutable-action-tag.github-actions-mutable-action-tag\",\n  \"path\": \".github/workflows/build.yml\",\n  \"start\": {\n    \"line\": 7,\n    \"col\": 9\n  },\n  \"end\": {\n    \"line\": 7,\n    \"col\": 34\n  },\n  \"extra\": {\n    \"message\": \"GitHub Actions step uses a mutable tag or branch reference. Tags and branch names can be silently repointed by the action owner, enabling supply-chain attacks — as seen in the trivy-action and kics-github-action compromises. Pin the reference to a full 40-character commit SHA instead, e.g. `uses: actions/checkout@8ade135a41bc03ea155e62e844d188df1ea18608`.\",\n    \"severity\": \"WARNING\"\n  }\n}",
+          "refs": [
+            {
+              "url": "https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions#using-third-party-actions"
+            },
+            {
+              "url": "https://semgrep.dev/r/yaml.github-actions.security.github-actions-mutable-action-tag.github-actions-mutable-action-tag"
+            },
+            {
+              "url": "https://sg.run/2LgAL"
+            }
+          ],
           "title": "Github Actions Mutable Action Tag",
           "verificationMethod": "automated"
         },
         {
+          "cwe": [
+            "CWE-78"
+          ],
           "descriptions": [
             {
               "data": "A `run:` step pipes the output of `curl` or `wget` directly into a shell interpreter. This is the \"curl | bash\" install pattern — if the remote server is compromised or the URL is hijacked, an attacker can execute arbitrary code in your CI runner. Consider downloading the file first, verifying its checksum or signature, and then executing it.",
@@ -72,10 +90,14 @@
             {
               "codeDesc": "Path: .github/workflows/build.yml, line 9",
               "message": "",
-              "startTime": "2026-08-21T21:34:15.183179Z",
+              "startTime": "2026-09-02T01:41:58.079677Z",
               "status": "failed"
             }
           ],
+          "sourceLocation": {
+            "line": 9,
+            "ref": ".github/workflows/build.yml"
+          },
           "id": "yaml.github-actions.security.gha-curl-pipe-shell.gha-curl-pipe-shell",
           "impact": 0.7,
           "tags": {
@@ -96,12 +118,6 @@
               "A03:2021 - Injection",
               "A03:2025 - Injection"
             ],
-            "references": [
-              "https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions",
-              "https://www.idontplaydarts.com/2016/04/detecting-curl-pipe-bash-server-side/",
-              "https://semgrep.dev/r/yaml.github-actions.security.gha-curl-pipe-shell.gha-curl-pipe-shell",
-              "https://sg.run/GR8K1"
-            ],
             "semgrepImpact": "HIGH",
             "severity": "ERROR",
             "subcategory": [
@@ -116,7 +132,22 @@
               "Command Injection"
             ]
           },
+          "code": "{\n  \"check_id\": \"yaml.github-actions.security.gha-curl-pipe-shell.gha-curl-pipe-shell\",\n  \"path\": \".github/workflows/build.yml\",\n  \"start\": {\n    \"line\": 9,\n    \"col\": 9\n  },\n  \"end\": {\n    \"line\": 9,\n    \"col\": 92\n  },\n  \"extra\": {\n    \"message\": \"A `run:` step pipes the output of `curl` or `wget` directly into a shell interpreter. This is the \\\"curl | bash\\\" install pattern — if the remote server is compromised or the URL is hijacked, an attacker can execute arbitrary code in your CI runner. Consider downloading the file first, verifying its checksum or signature, and then executing it.\",\n    \"severity\": \"ERROR\"\n  }\n}",
           "controlType": "technical",
+          "refs": [
+            {
+              "url": "https://docs.github.com/en/actions/security-guides/security-hardening-for-github-actions"
+            },
+            {
+              "url": "https://www.idontplaydarts.com/2016/04/detecting-curl-pipe-bash-server-side/"
+            },
+            {
+              "url": "https://semgrep.dev/r/yaml.github-actions.security.gha-curl-pipe-shell.gha-curl-pipe-shell"
+            },
+            {
+              "url": "https://sg.run/GR8K1"
+            }
+          ],
           "title": "Gha Curl Pipe Shell",
           "verificationMethod": "automated"
         },
@@ -130,15 +161,15 @@
           "results": [
             {
               "codeDesc": "Path: .github/workflows/build.yml",
-              "message": "PartialParsing: Syntax error at line .github/workflows/build.yml:9:\n When parsing a snippet as Bash for metavariable-pattern in rule 'yaml.github-actions.security.curl-eval.curl-eval', `{ steps.scan.outcome` was unexpected",
-              "startTime": "2026-08-21T21:34:15.183179Z",
-              "status": "error"
+              "message": "PartialParsing [warn]: Syntax error at line .github/workflows/build.yml:9:\n When parsing a snippet as Bash for metavariable-pattern in rule 'yaml.github-actions.security.curl-eval.curl-eval', `{ steps.scan.outcome` was unexpected",
+              "startTime": "2026-09-02T01:41:58.079677Z",
+              "status": "notReviewed"
             },
             {
               "codeDesc": "Path: .github/workflows/build.yml",
-              "message": "PartialParsing: Syntax error at line .github/workflows/build.yml:9:\n When parsing a snippet as Bash for metavariable-pattern in rule 'yaml.github-actions.security.gha-curl-pipe-shell.gha-curl-pipe-shell', `{ steps.scan.outcome` was unexpected",
-              "startTime": "2026-08-21T21:34:15.183179Z",
-              "status": "error"
+              "message": "PartialParsing [warn]: Syntax error at line .github/workflows/build.yml:9:\n When parsing a snippet as Bash for metavariable-pattern in rule 'yaml.github-actions.security.gha-curl-pipe-shell.gha-curl-pipe-shell', `{ steps.scan.outcome` was unexpected",
+              "startTime": "2026-09-02T01:41:58.079677Z",
+              "status": "notReviewed"
             }
           ],
           "id": "semgrep-scan-errors",
@@ -147,10 +178,34 @@
             "nist": [
               "SA-11",
               "RA-5"
-            ]
+            ],
+            "severity_rating": "unrated"
           },
           "title": "Semgrep scan errors",
           "verificationMethod": "automated"
+        },
+        {
+          "descriptions": [
+            {
+              "data": "Semgrep scanned 1 file(s); 2 rule(s) produced findings and 2 scan error(s) were reported. Semgrep reports violations only and does not enumerate the rules that ran without finding anything, so no passing requirements can be derived from its output and the compliance ratio should not be read as a pass rate.",
+              "label": "default"
+            }
+          ],
+          "results": [
+            {
+              "codeDesc": "Semgrep scanned 1 file(s); 2 rule(s) produced findings and 2 scan error(s) were reported. Semgrep reports violations only and does not enumerate the rules that ran without finding anything, so no passing requirements can be derived from its output and the compliance ratio should not be read as a pass rate.",
+              "startTime": "2026-09-02T01:41:58.079677Z",
+              "status": "notApplicable"
+            }
+          ],
+          "id": "semgrep-scan-coverage",
+          "impact": 0,
+          "tags": {
+            "filesScanned": 1,
+            "rulesWithFindings": 2,
+            "scanErrors": 2
+          },
+          "title": "Semgrep scan coverage"
         }
       ],
       "resultsChecksum": {
@@ -165,9 +220,8 @@
     "name": "semgrep-to-hdf",
     "version": "1.0.0"
   },
-  "timestamp": "2026-08-21T21:34:15.183179Z",
+  "timestamp": "2026-09-02T01:41:58.079677Z",
   "tool": {
-    "format": "json",
     "name": "Semgrep",
     "version": "1.174.0"
   }
